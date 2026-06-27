@@ -1,0 +1,72 @@
+{
+  "city": {
+    "slug": "lisbon",
+    "name": "Lisbon",
+    "country": "Portugal",
+    "lat": 38.7223,
+    "lng": -9.1393,
+    "isActive": true
+  },
+  "listings": [
+    {
+      "name": "Avenida Chill Hotel",
+      "type": "hotel",
+      "lat": 38.7207,
+      "lng": -9.1459,
+      "address": "Avenida da Liberdade",
+      "source": "manual",
+      "sourceUrl": "https://example.com/avenida-chill-hotel",
+      "affiliateBaseUrl": "https://example.com/book/avenida-chill-hotel",
+      "acType": "central",
+      "evidenceSummary": "Multiple recent guests describe rooms cooling quickly at night, with no reports of throttled central AC in the seed set.",
+      "editorial": {
+        "handpicked": true,
+        "editorVerified": true,
+        "editorScore": "verified_cold"
+      },
+      "reviewExcerpts": [
+        "The room got properly cold after a hot day outside.",
+        "Strong air conditioning and easy temperature control.",
+        "Excellent cooling overnight even during a warm week.",
+        "Central AC kept the room cool without noise."
+      ]
+    },
+    {
+      "name": "Alfama Cool Loft",
+      "type": "str",
+      "lat": 38.7118,
+      "lng": -9.1296,
+      "address": "Alfama",
+      "source": "manual",
+      "sourceUrl": "https://example.com/alfama-cool-loft",
+      "affiliateBaseUrl": "https://example.com/book/alfama-cool-loft",
+      "acType": "split",
+      "evidenceSummary": "Seed evidence points to a dedicated split unit that guests could control directly.",
+      "editorial": {
+        "handpicked": true
+      },
+      "reviewExcerpts": [
+        "The split AC was powerful and cooled the loft fast.",
+        "Great cooling in the bedroom with the door closed.",
+        "A little warm in the kitchen, but the sleeping area stayed cool."
+      ]
+    },
+    {
+      "name": "Baixa Breeze Rooms",
+      "type": "hotel",
+      "lat": 38.7111,
+      "lng": -9.1389,
+      "address": "Baixa",
+      "source": "manual",
+      "sourceUrl": "https://example.com/baixa-breeze-rooms",
+      "affiliateBaseUrl": "https://example.com/book/baixa-breeze-rooms",
+      "acType": "portable",
+      "evidenceSummary": "Early evidence is limited but includes one useful cooling report and editorial monitoring.",
+      "editorial": {},
+      "reviewExcerpts": [
+        "The portable AC helped, but it took a long time to cool the room.",
+        "Room was comfortable once the unit had been running."
+      ]
+    }
+  ]
+}

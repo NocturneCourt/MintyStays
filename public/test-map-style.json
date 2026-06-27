@@ -1,0 +1,14 @@
+{
+  "version": 8,
+  "name": "MintyStays Test",
+  "sources": {},
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#edf4f1"
+      }
+    }
+  ]
+}

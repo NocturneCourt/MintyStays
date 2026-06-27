@@ -14,8 +14,11 @@ out/
 
 # Build and test output
 coverage/
+dist/
+build/
 test-results/
 playwright-report/
+tsconfig.tsbuildinfo
 
 # Logs
 *.log
