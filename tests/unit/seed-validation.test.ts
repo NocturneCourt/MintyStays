@@ -16,11 +16,12 @@ const validListing: SeedListing = {
   lat: 38.72,
   lng: -9.14,
   source: "manual",
-  affiliateBaseUrl: "https://example.com/book",
+  sourceUrl: "https://www.booking.com/reviews/pt/hotel/cold-test.html",
+  affiliateBaseUrl: "https://www.booking.com/hotel/pt/cold-test.html",
   evidenceSummary: "Guests repeatedly report strong room cooling.",
   evidenceSource: {
     label: "Manual research",
-    url: "https://example.com/reviews",
+    url: "https://www.booking.com/reviews/pt/hotel/cold-test.html",
     observedAt: "2026-06-27",
     paraphrased: true,
   },
@@ -42,7 +43,7 @@ describe("validateSeedListings", () => {
 
     expect(result.ok).toBe(true);
     expect(result.listingCount).toBe(6);
-    expect(result.reviewExcerptCount).toBe(13);
+    expect(result.reviewExcerptCount).toBe(7);
   });
 
   it("requires city metadata and at least one listing", () => {
@@ -90,6 +91,21 @@ describe("validateSeedListings", () => {
     expect(result.errors[0].code).toBe("listing.missing_affiliate_url");
   });
 
+  it("treats placeholder source URLs as strict failures", () => {
+    const result = validateSeedListings(
+      [
+        {
+          ...validListing,
+          sourceUrl: "https://example.com/listing",
+        },
+      ],
+      { strict: true },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.errors[0].code).toBe("listing.placeholder_url");
+  });
+
   it("requires paraphrased evidence confirmation in strict mode", () => {
     const result = validateSeedListings(
       [{ ...validListing, evidenceSource: undefined }],
@@ -127,7 +143,7 @@ describe("validateSeedListings", () => {
         evidenceSummary: "DRAFT ONLY: no cooling candidate found in capture.",
         evidenceSource: {
           label: "Tool-assisted research capture",
-          url: "https://example.com/listing",
+          url: "https://research.example.test/listing",
           observedAt: "2026-07-02",
           paraphrased: false,
         },

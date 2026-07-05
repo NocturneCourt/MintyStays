@@ -34,15 +34,20 @@ describe("public listing seed fallback", () => {
       },
     });
 
-    expect(listings.map((listing) => listing.name)).toEqual(["Baixa Breeze Rooms"]);
+    expect(listings.map((listing) => listing.name)).toEqual([
+      "Lisbon Art Stay Hotel & Apartments",
+      "Be Poet Baixa Hotel",
+    ]);
   });
 
   it("loads fallback listing details by seed id", async () => {
     vi.stubEnv("DATABASE_URL", "");
 
-    await expect(getListingDetail("avenida-chill-hotel-1")).resolves.toMatchObject({
-      name: "Avenida Chill Hotel",
-      editorScore: "verified_cold",
+    await expect(
+      getListingDetail("lisbon-art-stay-hotel-apartments-1"),
+    ).resolves.toMatchObject({
+      name: "Lisbon Art Stay Hotel & Apartments",
+      editorScore: null,
     });
   });
 });

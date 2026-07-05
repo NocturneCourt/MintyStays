@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { ManualImportAdapter } from "@/lib/sources/ManualImportAdapter";
 
 describe("ManualImportAdapter", () => {
-  it("imports JSON seed files with city metadata and editorial fields", async () => {
+  it("imports JSON seed files with city metadata and Booking-backed rows", async () => {
     const adapter = new ManualImportAdapter();
     const listings = await adapter.importCity({
       citySlug: "lisbon",
@@ -14,7 +14,11 @@ describe("ManualImportAdapter", () => {
 
     expect(listings).toHaveLength(6);
     expect(listings[0].city?.name).toBe("Lisbon");
-    expect(listings[0].editorial?.editorVerified).toBe(true);
+    expect(listings[0]).toMatchObject({
+      name: "Lisbon Art Stay Hotel & Apartments",
+      source: "manual_booking_public",
+      editorial: {},
+    });
   });
 
   it("imports CSV seed files", async () => {

@@ -87,6 +87,7 @@ export function validateSeedListings(
 
     validateCoordinate(listing.lat, "listing.latitude", listingName, addError);
     validateCoordinate(listing.lng, "listing.longitude", listingName, addError);
+    validateSourceUrls(listing, addWarning);
 
     if (!listing.affiliateBaseUrl) {
       addWarning({
@@ -178,6 +179,25 @@ function validateCoordinate(
   }
 }
 
+function validateSourceUrls(
+  listing: SeedListing,
+  addWarning: (issue: Omit<SeedValidationIssue, "severity">) => void,
+) {
+  const urls = [
+    listing.sourceUrl,
+    listing.affiliateBaseUrl,
+    listing.evidenceSource?.url,
+  ].filter((url): url is string => Boolean(url));
+
+  if (urls.some(isPlaceholderUrl)) {
+    addWarning({
+      code: "listing.placeholder_url",
+      listingName: listing.name,
+      message: "Seed listing uses a placeholder URL instead of an auditable source.",
+    });
+  }
+}
+
 function validateResearchEvidence(
   listing: SeedListing,
   addError: (issue: Omit<SeedValidationIssue, "severity">) => void,
@@ -247,4 +267,13 @@ function looksLikeCopiedReviewText(value: string) {
     /["“”]$/.test(trimmed) ||
     /\bI\b.*\b(my|our|we|stayed|room)\b/i.test(trimmed)
   );
+}
+
+function isPlaceholderUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === "example.com" || hostname === "www.example.com";
+  } catch {
+    return false;
+  }
 }

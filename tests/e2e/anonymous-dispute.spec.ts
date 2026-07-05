@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("anonymous visitor disputes weak cooling once per listing session", async ({
   page,
 }) => {
-  await page.goto("/listings/avenida-chill-hotel-1");
+  await page.goto("/listings/lisbon-art-stay-hotel-apartments-1");
 
   await expect(page.getByRole("heading", { name: "How was the cooling?" })).toBeVisible();
   await page.getByLabel("Dispute weak").check();
@@ -25,7 +25,7 @@ test("anonymous contribution API sets a session cookie and blocks duplicates", a
   request,
 }) => {
   const payload = {
-    listingId: "alfama-cool-loft-2",
+    listingId: "lisbon-5-hotel-2",
     vote: "confirm_cold",
     comment: "Bedroom stayed cold all night.",
   };

@@ -15,7 +15,7 @@ test("auth-enabled flows expose sign-in and protected member/editor routes", asy
 
   const insiderReport = await request.post("/api/insider/reports", {
     data: {
-      listingId: "avenida-chill-hotel-1",
+      listingId: "lisbon-art-stay-hotel-apartments-1",
       vote: "confirm_cold",
     },
   });
@@ -34,6 +34,6 @@ test("auth-enabled flows expose sign-in and protected member/editor routes", asy
   await page.goto("/");
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 
-  await page.goto("/listings/avenida-chill-hotel-1");
+  await page.goto("/listings/lisbon-art-stay-hotel-apartments-1");
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });

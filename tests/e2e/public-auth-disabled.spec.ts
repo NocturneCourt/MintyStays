@@ -9,14 +9,14 @@ test("keeps auth-gated surfaces unavailable while public site works", async ({
 
   const insiderReport = await request.post("/api/insider/reports", {
     data: {
-      listingId: "avenida-chill-hotel-1",
+      listingId: "lisbon-art-stay-hotel-apartments-1",
       vote: "confirm_cold",
     },
   });
   expect(insiderReport.status()).toBe(404);
 
   const editorUpdate = await request.patch(
-    "/api/editor/listings/avenida-chill-hotel-1",
+    "/api/editor/listings/lisbon-art-stay-hotel-apartments-1",
     {
       data: {
         isHandpicked: true,
@@ -30,9 +30,9 @@ test("keeps auth-gated surfaces unavailable while public site works", async ({
   await expect(page.getByRole("link", { name: "Sign in" })).toHaveCount(0);
   await expect(page.locator(".pin")).toHaveCount(6);
 
-  await page.goto("/listings/avenida-chill-hotel-1");
+  await page.goto("/listings/lisbon-art-stay-hotel-apartments-1");
   await expect(
-    page.getByRole("heading", { name: "Avenida Chill Hotel" }),
+    page.getByRole("heading", { name: "Lisbon Art Stay Hotel & Apartments" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "How was the cooling?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Insider report" })).toHaveCount(0);

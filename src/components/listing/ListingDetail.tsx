@@ -38,7 +38,7 @@ export function ListingDetail({
         <div className="detail-hero">
           <div className="detail-intro">
             <TrustBadge tier={listing.trustTier} />
-            <span className="eyebrow">Cooling dossier</span>
+            <span className="eyebrow">Evidence snapshot</span>
             <h1>{listing.name}</h1>
             <p className="listing-meta detail-meta">
               {listing.type === "hotel" ? (
@@ -56,18 +56,14 @@ export function ListingDetail({
               ) : null}
             </p>
             <p className="detail-summary">
-              {listing.acType ? `${formatAcType(listing.acType)} AC` : "AC type unknown"} with{" "}
-              {listing.reviewCountAnalyzed} cooling signals reviewed. Guest
-              Signal and Editor Score stay separate so cooling risk is easier to
-              judge before booking.
+              {formatDetailSummary(listing)}
             </p>
           </div>
           <section className="detail-score-card" aria-label="Cooling scores">
             <ScoreRows listing={listing} layout="panel" />
             <p className="score-note">
-              Guest Signal is computed from review and contribution data. Editor
-              Score is a separate human verification layer and is never averaged
-              into Guest Signal. <Link href="/guest-signal">See the formula</Link>.
+              Guest Signal uses cooling mentions and reports. Editor Score is a
+              separate human check. <Link href="/guest-signal">Formula</Link>.
             </p>
           </section>
         </div>
@@ -81,7 +77,7 @@ export function ListingDetail({
           <div>
             <MapPin size={18} aria-hidden="true" />
             <span>Evidence</span>
-            <strong>{listing.reviewCountAnalyzed} signals read</strong>
+            <strong>{formatCoolingMentionCount(listing.reviewCountAnalyzed)} read</strong>
           </div>
           <div>
             <ExternalLink size={18} aria-hidden="true" />
@@ -93,19 +89,18 @@ export function ListingDetail({
         <div className="detail-grid">
           <section className="detail-panel">
             <span className="eyebrow">Evidence</span>
-            <h2>Cooling read</h2>
+            <h2>What we found</h2>
             <p className="evidence">{listing.evidenceSummary}</p>
           </section>
           <section className="detail-panel booking-panel">
             <span className="eyebrow">Booking path</span>
-            <h2>Check the room</h2>
+            <h2>Open Booking.com</h2>
             <p className="evidence">
-              Use the outbound booking path, then confirm AC specifics before
-              checkout.
+              Confirm the exact room&apos;s AC setup before checkout.
             </p>
             {listing.affiliateUrl ? (
               <a className="booking-link" href={`/api/affiliate-click?id=${listing.id}`}>
-                Open booking path
+                Open Booking.com
                 <ExternalLink size={16} aria-hidden="true" />
               </a>
             ) : null}
@@ -137,6 +132,23 @@ export function ListingDetail({
       </article>
     </main>
   );
+}
+
+function formatDetailSummary(listing: PublicListing) {
+  const acType = listing.acType
+    ? `${formatAcType(listing.acType)} AC`
+    : "AC type not confirmed";
+  const mentionCount = formatCoolingMentionCount(listing.reviewCountAnalyzed);
+
+  if (listing.guestSignalStatus === "unverified") {
+    return `${acType}. ${mentionCount} reviewed. Not enough evidence to score cooling yet.`;
+  }
+
+  return `${acType}. ${mentionCount} reviewed. Guest Signal and Editor Score stay separate.`;
+}
+
+function formatCoolingMentionCount(count: number) {
+  return `${count} cooling ${count === 1 ? "mention" : "mentions"}`;
 }
 
 function formatAcType(acType: NonNullable<PublicListing["acType"]>) {

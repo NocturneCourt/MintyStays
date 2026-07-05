@@ -21,6 +21,9 @@ export function ScoreRows({
     ? coldIndexForEditorScore(listing.editorScore)
     : null;
   const confidence = formatConfidence(listing.guestSignalConfidence);
+  const coolingMentionLabel = formatCoolingMentionCount(
+    listing.reviewCountAnalyzed,
+  );
 
   return (
     <div className={`score-rows ${layout}`} aria-label="Cooling score details">
@@ -32,7 +35,7 @@ export function ScoreRows({
               className="gauge-value"
               style={guestIndex ? { color: guestIndex.solid } : undefined}
             >
-              {hasGuestScore ? `${listing.guestSignalScore}/100` : "Unverified"}
+              {hasGuestScore ? `${listing.guestSignalScore}/100` : "Unscored"}
             </span>
           </div>
           {hasGuestScore ? (
@@ -54,7 +57,7 @@ export function ScoreRows({
             </span>
           ) : (
             <span className="gauge-chip">
-              Fewer than three effective cooling mentions
+              {coolingMentionLabel} found. Needs 3 to score.
             </span>
           )}
           {hasGuestScore ? (
@@ -75,35 +78,40 @@ export function ScoreRows({
               className="gauge-value"
               style={editorIndex ? { color: editorIndex.solid } : undefined}
             >
-              {listing.editorScore ? formatEditorScore(listing.editorScore) : "Not set"}
+              {listing.editorScore
+                ? formatEditorScore(listing.editorScore)
+                : "Not reviewed"}
             </span>
           </div>
-          <span
-            className={`gauge-notches ${listing.editorScore ? "" : "absent"}`}
-            aria-hidden="true"
-          >
-            {(["glacier", "temperate", "warm", "hot"] as ColdBand[]).map(
-              (band) => (
-                <span
-                  key={band}
-                  className={editorIndex?.band === band ? "is-active" : ""}
-                  style={
-                    editorIndex?.band === band
-                      ? ({ "--notch-color": editorIndex.solid } as CSSProperties)
-                      : undefined
-                  }
-                />
-              ),
-            )}
-          </span>
+          {listing.editorScore ? (
+            <span className="gauge-notches" aria-hidden="true">
+              {(["glacier", "temperate", "warm", "hot"] as ColdBand[]).map(
+                (band) => (
+                  <span
+                    key={band}
+                    className={editorIndex?.band === band ? "is-active" : ""}
+                    style={
+                      editorIndex?.band === band
+                        ? ({ "--notch-color": editorIndex.solid } as CSSProperties)
+                        : undefined
+                    }
+                  />
+                ),
+              )}
+            </span>
+          ) : null}
           <span className="gauge-caption">
-            {editorIndex ? `${editorIndex.label} / human check` : "Human check pending"}
+            {editorIndex ? `${editorIndex.label} / editor check` : "No editor check yet"}
           </span>
         </section>
       </div>
-      <p className="dual-gauge-note">Kept separate. Never averaged.</p>
+      <p className="dual-gauge-note">Guest data and editor checks stay separate.</p>
     </div>
   );
+}
+
+function formatCoolingMentionCount(count: number) {
+  return `${count} cooling ${count === 1 ? "mention" : "mentions"}`;
 }
 
 function formatConfidence(confidence: PublicListing["guestSignalConfidence"]) {
