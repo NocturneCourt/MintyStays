@@ -1149,9 +1149,17 @@ textarea {
   white-space: normal;
 }
 
-.score-rows.compact .gauge-conf,
+.score-rows.compact .gauge-conf {
+  font-size: 10px;
+}
+
 .score-rows.compact .gauge-caption,
 .score-rows.compact .dual-gauge-note {
+  display: none;
+}
+
+.score-rows.compact .gauge-chip {
+  padding: 3px 7px;
   font-size: 10px;
 }
 

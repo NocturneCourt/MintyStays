@@ -1,14 +1,19 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "ms-theme";
+const THEME_EVENT = "ms-theme-change";
 
 type Theme = "light" | "dark";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(getCurrentTheme);
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    getCurrentTheme,
+    getServerTheme,
+  );
 
   const toggle = () => {
     const next: Theme = theme === "dark" ? "light" : "dark";
@@ -18,7 +23,7 @@ export function ThemeToggle() {
     } catch {
       // Storage unavailable (private mode): theme still applies to this view.
     }
-    setTheme(next);
+    window.dispatchEvent(new Event(THEME_EVENT));
   };
 
   return (
@@ -38,6 +43,20 @@ export function ThemeToggle() {
       <span>{theme === "dark" ? "Daybreak" : "Night Frost"}</span>
     </button>
   );
+}
+
+function subscribeToTheme(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(THEME_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(THEME_EVENT, onStoreChange);
+  };
+}
+
+function getServerTheme(): Theme {
+  return "light";
 }
 
 function getCurrentTheme(): Theme {

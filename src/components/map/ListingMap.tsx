@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import maplibregl, { type Map } from "maplibre-gl";
 import {
@@ -26,7 +26,7 @@ export function ListingMap({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
-  const positions = projectListings(listings);
+  const [positions, setPositions] = useState<Record<string, PinPosition>>({});
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -45,6 +45,45 @@ export function ListingMap({
       mapRef.current = null;
     };
   }, [city.lat, city.lng, styleUrl]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    let frame = 0;
+    const syncPinPositions = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        setPositions(
+          Object.fromEntries(
+            listings.map((listing) => {
+              const point = map.project([listing.lng, listing.lat]);
+
+              return [
+                listing.id,
+                {
+                  left: point.x,
+                  top: point.y,
+                },
+              ];
+            }),
+          ),
+        );
+      });
+    };
+
+    syncPinPositions();
+    map.on("load", syncPinPositions);
+    map.on("move", syncPinPositions);
+    map.on("resize", syncPinPositions);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      map.off("load", syncPinPositions);
+      map.off("move", syncPinPositions);
+      map.off("resize", syncPinPositions);
+    };
+  }, [listings]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -77,6 +116,16 @@ export function ListingMap({
         {listings.map((listing) => {
           const position = positions[listing.id];
           const pin = getPinPresentation(listing);
+          const positionStyle = position
+            ? {
+                left: `${position.left}px`,
+                top: `${position.top}px`,
+              }
+            : {
+                left: "50%",
+                top: "50%",
+                opacity: 0,
+              };
 
           return (
             <button
@@ -86,8 +135,7 @@ export function ListingMap({
                 listing.id === selectedId ? "is-selected" : ""
               }`}
               style={{
-                left: `${position.left}%`,
-                top: `${position.top}%`,
+                ...positionStyle,
                 ...pin.style,
               }}
               aria-label={`Select ${listing.name}`}
@@ -111,35 +159,10 @@ export function ListingMap({
   );
 }
 
-function projectListings(listings: PublicListing[]) {
-  const lats = listings.map((listing) => listing.lat);
-  const lngs = listings.map((listing) => listing.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = Math.max(maxLat - minLat, 0.01);
-  const lngRange = Math.max(maxLng - minLng, 0.01);
-
-  return Object.fromEntries(
-    listings.map((listing) => {
-      const x = 18 + ((listing.lng - minLng) / lngRange) * 68;
-      const y = 18 + (1 - (listing.lat - minLat) / latRange) * 56;
-
-      return [
-        listing.id,
-        {
-          left: clamp(x, 18, 86),
-          top: clamp(y, 18, 74),
-        },
-      ];
-    }),
-  );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
+type PinPosition = {
+  left: number;
+  top: number;
+};
 
 type PinPresentation =
   | {

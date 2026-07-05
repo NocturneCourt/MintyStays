@@ -23,6 +23,7 @@ export function ScoreRows({
   const confidence = formatConfidence(listing.guestSignalConfidence);
   const coolingMentionLabel = formatCoolingMentionCount(
     listing.reviewCountAnalyzed,
+    layout,
   );
 
   return (
@@ -57,7 +58,9 @@ export function ScoreRows({
             </span>
           ) : (
             <span className="gauge-chip">
-              {coolingMentionLabel} found. Needs 3 to score.
+              {layout === "compact"
+                ? `${coolingMentionLabel}. Needs 3.`
+                : `${coolingMentionLabel} found. Needs 3 to score.`}
             </span>
           )}
           {hasGuestScore ? (
@@ -110,7 +113,14 @@ export function ScoreRows({
   );
 }
 
-function formatCoolingMentionCount(count: number) {
+function formatCoolingMentionCount(
+  count: number,
+  layout: "compact" | "panel",
+) {
+  if (layout === "compact") {
+    return `${count} ${count === 1 ? "mention" : "mentions"}`;
+  }
+
   return `${count} cooling ${count === 1 ? "mention" : "mentions"}`;
 }
 
