@@ -1,3 +1,4 @@
+import type { GuestSignalConfidence } from "@/lib/scoring/guestSignalFormula";
 import type { EditorScore, TrustTier } from "@/lib/scoring/trustTier";
 
 export type ListingType = "hotel" | "str";
@@ -27,6 +28,7 @@ export type PublicListing = {
   acType?: AcType;
   guestSignalScore: number | null;
   guestSignalStatus: "unverified" | "scored";
+  guestSignalConfidence: GuestSignalConfidence | null;
   editorScore: EditorScore | null;
   trustTier: TrustTier;
   evidenceSummary: string;

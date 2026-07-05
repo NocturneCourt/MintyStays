@@ -6,9 +6,9 @@ test("public launch path covers map, filters, detail, dispute, and affiliate exi
 }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Lisbon" })).toBeVisible();
-  await expect(page.locator(".pin")).toHaveCount(3);
-  await expect(page.locator(".listing-card .evidence")).toHaveCount(3);
+  await expect(page.getByRole("heading", { name: "Lisbon", exact: true })).toBeVisible();
+  await expect(page.locator(".pin")).toHaveCount(6);
+  await expect(page.locator(".listing-card .evidence")).toHaveCount(6);
 
   for (const evidence of await page.locator(".listing-card .evidence").all()) {
     expect((await evidence.innerText()).trim().length).toBeGreaterThan(20);

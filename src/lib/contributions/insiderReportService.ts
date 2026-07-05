@@ -77,6 +77,7 @@ export async function submitInsiderReport(
       coolingSentiment: contributionToSentiment(input.vote),
       acTypeHint: undefined,
       weight: "2.50",
+      authoredAt: now,
       extractedAt: now,
     });
 

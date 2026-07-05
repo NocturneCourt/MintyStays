@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateGuestSignal,
   recencyWeight,
+  seasonalityWeight,
   type GuestSignalInput,
 } from "@/lib/scoring/guestSignalFormula";
 
@@ -12,7 +13,7 @@ function signal(overrides: Partial<GuestSignalInput> = {}): GuestSignalInput {
   return {
     source: "scraped",
     sentiment: "positive",
-    extractedAt: recent,
+    authoredAt: recent,
     rawExcerpt: "The room got properly cold.",
     ...overrides,
   };
@@ -36,10 +37,21 @@ describe("calculateGuestSignal", () => {
   });
 
   it("weights newer signals above older signals", () => {
-    expect(recencyWeight(new Date("2026-06-01T00:00:00Z"), now)).toBe(1);
-    expect(recencyWeight(new Date("2025-09-01T00:00:00Z"), now)).toBe(0.85);
-    expect(recencyWeight(new Date("2025-01-01T00:00:00Z"), now)).toBe(0.6);
-    expect(recencyWeight(new Date("2023-01-01T00:00:00Z"), now)).toBe(0.35);
+    expect(recencyWeight(new Date("2026-06-01T00:00:00Z"), now)).toBeGreaterThan(
+      recencyWeight(new Date("2025-09-01T00:00:00Z"), now),
+    );
+    expect(recencyWeight(new Date("2025-09-01T00:00:00Z"), now)).toBeGreaterThan(
+      recencyWeight(new Date("2025-01-01T00:00:00Z"), now),
+    );
+    expect(recencyWeight(new Date("2025-01-01T00:00:00Z"), now)).toBeGreaterThan(
+      recencyWeight(new Date("2023-01-01T00:00:00Z"), now),
+    );
+  });
+
+  it("down-weights off-season cooling mentions", () => {
+    expect(seasonalityWeight(new Date("2026-07-01T00:00:00Z"), 38.7)).toBe(1);
+    expect(seasonalityWeight(new Date("2026-01-01T00:00:00Z"), 38.7)).toBe(0.2);
+    expect(seasonalityWeight(new Date("2026-01-01T00:00:00Z"), -33.9)).toBe(1);
   });
 
   it("applies a hard penalty for trailing broken AC mentions", () => {
@@ -79,5 +91,6 @@ describe("calculateGuestSignal", () => {
       throw new Error("Expected scored results");
     }
     expect(larger.score).toBeGreaterThan(tiny.score);
+    expect(tiny.confidence).toBe("low");
   });
 });

@@ -70,12 +70,13 @@ function parseCsvSeed(raw: string, citySlug: string): SeedListing[] {
       affiliateBaseUrl: blankToUndefined(record.affiliate_base_url),
       acType: blankToUndefined(record.ac_type),
       evidenceSummary: blankToUndefined(record.evidence_summary),
+      evidenceSource: parseCsvEvidenceSource(record),
       editorial: {
         handpicked: parseBoolean(record.handpicked),
         editorVerified: parseBoolean(record.editor_verified),
         editorScore: blankToUndefined(record.editor_score),
       },
-      reviewExcerpts: splitList(record.review_excerpts),
+      reviewExcerpts: parseReviewExcerpts(record),
     }),
   );
 }
@@ -103,6 +104,35 @@ function parseCsvCity(record: Record<string, string>) {
     lng: Number(lng),
     isActive: parseBoolean(record.city_is_active) ?? true,
   };
+}
+
+function parseCsvEvidenceSource(record: Record<string, string>) {
+  const label = blankToUndefined(record.evidence_source_label);
+  const url = blankToUndefined(record.evidence_source_url);
+  const observedAt = blankToUndefined(record.evidence_observed_at);
+  const paraphrased = parseBoolean(record.evidence_is_paraphrased);
+
+  if (!label && !url && !observedAt && paraphrased === undefined) {
+    return undefined;
+  }
+
+  return {
+    label,
+    url,
+    observedAt,
+    paraphrased,
+  };
+}
+
+function parseReviewExcerpts(record: Record<string, string>) {
+  const texts = splitList(record.review_excerpts);
+  const authoredDates = splitList(record.review_authored_dates);
+
+  return texts.map((text, index) => ({
+    text,
+    authoredAt:
+      authoredDates[index] ?? (authoredDates.length === 1 ? authoredDates[0] : undefined),
+  }));
 }
 
 function blankToUndefined(value?: string) {

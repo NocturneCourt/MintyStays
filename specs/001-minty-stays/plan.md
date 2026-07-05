@@ -32,8 +32,10 @@ and click tracking
 database-backed APIs
 
 **Performance Goals**: Launch-city map loads usable listing data in under 2
-seconds on a typical broadband connection; filter updates feel immediate for
-MVP listing volume; scoring jobs can rerun for the launch city on demand
+seconds on a typical broadband connection; map data loads are scoped to the
+current bounding box via the `(city_id, lat)` and `(city_id, lng)` btrees rather
+than loading the whole city; filter updates feel immediate for MVP listing
+volume; scoring jobs can rerun for the launch city on demand
 
 **Constraints**: Public site must work with `AUTH_ENABLED=false`; no core logic
 may import a scraper; Guest Signal and Editor Score never blend; Handpicked and
@@ -54,14 +56,18 @@ import, and listing-display change.*
   curation. Editor Verified requires direct confirmation and Editor Score.
 - **Keep Seeding Sources Swappable**: PASS. ListingSourceAdapter is the only
   seeding contract. ManualImportAdapter ships first. ScraperAdapter is a stub.
-- **Make Guest Signal Transparent**: PASS. The scoring formula is explicit and
-  unit-testable.
+- **Make Guest Signal Transparent**: PARTIAL. Formula is unit-testable but
+  recency currently keys off extraction time, has no seasonality, and exposes no
+  confidence. Tracked by FR-008/008a. Must reach PASS before launch.
 - **Keep Sources Separately Auditable**: PASS. ReviewSignal, UserContribution,
   and editorial fields retain source and attribution.
 - **Show No Empty Pins**: PASS. Public listing queries require evidence or
   editorial status.
 - **Ship One City End-to-End First**: PASS. City is configurable, but all MVP
   flows target one active launch city.
+- **Guard Score Separation Structurally**: PARTIAL. No blended column exists, but
+  no constraint or test enforces it and conflict UX is undesigned. Tracked by
+  FR-027 and Law VIII.
 
 ## Project Structure
 
@@ -118,9 +124,11 @@ src/
 |   +-- extraction/
 |   |   +-- coolingExtractor.ts
 |   |   +-- parseClaudeJson.ts
+|   |   +-- runExtraction.ts
 |   +-- scoring/
 |   |   +-- guestSignalFormula.ts
 |   |   +-- trustTier.ts
+|   |   +-- recomputeListingSignals.ts
 |   +-- sources/
 |       +-- ListingSourceAdapter.ts
 |       +-- ManualImportAdapter.ts
@@ -140,8 +148,10 @@ live under `src/lib`, database schema under `src/db`, route handlers under
 ### Public Request Flow
 
 1. Public page loads active launch city by configured slug.
-2. Listing query returns active listings that have cooling evidence or editorial
-   status.
+2. Listing query returns active listings in the current map bounding box that
+   have cooling evidence or editorial status, using the `(city_id, lat)` and
+   `(city_id, lng)` btrees. Upgrade to PostGIS `geography` + GiST and server-side
+   clustering on the second city or when a city exceeds ~2k listings.
 3. Map and side list receive listing summaries with separate Guest Signal and
    Editor Score fields.
 4. Filters apply to listing type, Guest Signal status or minimum score, and
@@ -172,7 +182,7 @@ type SeedListing = {
     editorVerified?: boolean;
     editorScore?: "verified_cold" | "verified_adequate" | "verified_weak" | "verified_broken";
   };
-  reviewExcerpts?: string[];
+  reviewExcerpts?: Array<{ text: string; authoredAt?: string }>;
 };
 
 interface ListingSourceAdapter {
@@ -182,7 +192,10 @@ interface ListingSourceAdapter {
 ```
 
 - **ManualImportAdapter**: Reads CSV or JSON seed files and supports editorial
-  fields while auth is off. This is the launch path.
+  fields while auth is off. This is the launch path. Each review excerpt carries
+  an optional authored date that maps to `raw_reviews.authored_at`; excerpts
+  without one are stored with `authored_at` null and excluded from recency and
+  seasonality weighting.
 - **ScraperAdapter**: Stub implementation behind the same interface. It cannot
   be imported by core scoring, UI, or route logic. Booking.com and Airbnb
   scraping are not architectural dependencies because of ToS and anti-bot risk.
@@ -191,24 +204,44 @@ interface ListingSourceAdapter {
 
 ### Extraction Pipeline
 
-1. Manual or adapter seed creates listings and raw review excerpts.
-2. Extraction job sends each review text to Claude API using model
-   `claude-sonnet-4-6`.
-3. Prompt requires JSON only:
+Raw review data and derived cooling classifications live in separate layers so
+scoring can re-run cheaply and extraction can re-run safely.
+
+1. Manual or adapter seed writes immutable rows to `raw_reviews` (one per review
+   or report) with `content_hash`, `authored_at`, source, and paraphrased
+   `raw_text`. Re-seeding the same text is a no-op via
+   `UNIQUE (listing_id, content_hash)`.
+2. Keyword pre-filter: text without cooling vocabulary
+   (`/\b(a\/?c|air[- ]?con|cooling|cold|hot|stuffy|stifling|fan|sweat|temperature)\b/i`)
+   is recorded as `mentions_cooling=false` and never sent to the LLM.
+3. Cache check: if a `cooling_extractions` row exists for this `content_hash` at
+   the current `extraction_version`, reuse it and skip the LLM.
+4. Surviving excerpts are batched and sent to Claude (`claude-sonnet-4-6`,
+   temperature 0). Prompt requires JSON only:
    `{ "mentions_cooling": boolean, "sentiment": "positive" | "negative" | "neutral", "ac_type_hint": "split" | "central" | "portable" | "none" | null, "confidence": number }`
-4. Parser strips code fences, parses JSON safely, validates required keys, and
-   drops or quarantines malformed responses.
-5. Mentions with `mentions_cooling=false` do not create ReviewSignal rows.
-6. ReviewSignal rows retain raw excerpt, source, sentiment, AC hint, weight, and
-   extraction timestamp.
-7. Broken or non-working AC mentions are detected for scoring from explicit
-   anonymous `broken` votes and deterministic phrase detection in negative raw
-   excerpts. The Claude JSON contract stays minimal as requested.
+5. Parser strips code fences, parses JSON safely, and validates with a strict
+   schema. On schema failure, one repair retry ("return ONLY the JSON object")
+   is made; still-failing rows go to a quarantine queue (never silently dropped).
+6. Valid results are written to `cooling_extractions`. Rows with
+   `mentions_cooling=true` project into the `review_signals` derived layer used
+   by scoring.
+7. Re-extraction is triggered by bumping `extraction_version` (model or prompt
+   change). `raw_reviews` is never re-fetched, and re-scoring never re-invokes
+   the LLM.
+8. Broken or non-working AC mentions are detected for scoring from explicit
+   anonymous `broken` votes and deterministic phrase detection in negative
+   `raw_text`. The Claude JSON contract stays minimal.
+
+Cache key: `sha256(normalized_text)`. Invalidation: only on `extraction_version`
+bump, never on re-score. Quarantined rows retain raw output for manual review.
 
 ### Guest Signal Formula
 
 Guest Signal uses scraped, anonymous, and Insider signals only. Editorial
-verification sets Editor Score and never enters Guest Signal.
+verification sets Editor Score and never enters Guest Signal. Each signal carries
+an AUTHORED date (when the review or report was written), a source, and a
+sentiment. Recency, seasonality, and the broken window are measured from the
+authored date, never from extraction time.
 
 Definitions:
 
@@ -217,23 +250,49 @@ Definitions:
   `guest_signal_status = "unverified"`.
 - Source weights: scraped review `1.0`, anonymous contribution `1.25`, Insider
   report `2.5`.
-- Recency weights by signal age: `1.0` for 0-180 days, `0.85` for 181-365 days,
-  `0.6` for 366-730 days, `0.35` for older signals.
-- `weightedPositive = sum(sourceWeight * recencyWeight)` for positive cooling
-  mentions.
-- `weightedTotal = sum(sourceWeight * recencyWeight)` for positive, negative,
-  and neutral cooling mentions.
-- Bayesian prior: prior ratio `0.55`, prior strength `8`.
-- `bayesRatio = (weightedPositive + 0.55 * 8) / (weightedTotal + 8)`.
-- `sampleMultiplier = 0.7 + 0.3 * min(1, coolingMentionCount / 12)`.
-- `prePenalty = round(100 * bayesRatio * sampleMultiplier)`.
-- `brokenPenalty = 35` when any broken or non-working AC mention exists in the
-  trailing 12 months, else `0`.
-- `guestSignal = clamp(prePenalty - brokenPenalty, 0, 100)`.
-- Set `guest_signal_status = "scored"` when a numeric score exists.
+- `ageDays = now - authoredAt`.
+- Recency weight `R = 0.5 ^ (ageDays / 540)` (smooth ~18-month half-life,
+  replacing the previous bucketed cliffs).
+- Seasonality weight `S = coolingSeasonWeight(month(authoredAt), hemisphere)`.
+  Northern hemisphere: Jun-Sep `1.0`, May/Oct `0.7`, Apr/Nov `0.4`, Dec-Mar
+  `0.2`. Hemisphere is northern when `city.lat >= 0` (the equator uses the
+  northern table) and southern when `city.lat < 0`. The southern hemisphere
+  applies the northern table to `((month - 1 + 6) mod 12) + 1`, i.e. Dec-Mar
+  `1.0`, Nov/Apr `0.7`, Oct/May `0.4`, Jun-Sep `0.2`.
+- Per-signal weight `w = sourceWeight * R * S`.
+- `weightedPositive = sum(w)` over positive cooling mentions.
+- `n_eff = sum(w)` over positive, negative, and neutral cooling mentions
+  (effective sample size).
+- Bayesian prior: prior ratio `m = 0.55`, prior strength `k = 8`.
+- `pHat = (weightedPositive + m * k) / (n_eff + k)`.
+- Effective-sample floor: if `n_eff < 1`, set `guest_signal_score = null` and
+  `guest_signal_status = "unverified"`. The 3-mention floor is on raw count; this
+  floor is on effective sample, so a few very old or off-season mentions cannot
+  publish a number. All terms below assume `n_eff >= 1`.
+- Confidence via the Wilson score interval half-width on `n_eff` (z = 1.0 for a
+  ~68% band):
+  - `denom = 1 + z^2 / n_eff`
+  - `half = (z / denom) * sqrt(pHat * (1 - pHat) / n_eff + z^2 / (4 * n_eff^2))`
+  - `bandWidth = round(100 * 2 * half)`
+  - `confidence = bandWidth <= 12 ? "high" : bandWidth <= 25 ? "moderate" : "low"`
+- `score = round(100 * pHat)` is the displayed point estimate; the Wilson band is
+  used only to derive the high/moderate/low label, not a displayed interval. The
+  Bayesian prior plus the confidence band replace the previous `sampleMultiplier`,
+  which double-counted small-sample shrinkage.
+- Broken penalty (soft, recency- and season-weighted, replacing the flat 35
+  cliff):
+  - `brokenWeight = sum(w) = sum(sourceWeight * R * S)` over broken mentions
+    authored within 365 days.
+  - `penalty = min(40, 10 * brokenWeight)`.
+  - Broken mentions are also counted as negatives inside `n_eff`; this soft
+    penalty applies on top of that, and the double effect is intentional.
+- `guestSignal = clamp(score - penalty, 0, 100)`.
+- Set `guest_signal_status = "scored"` when a numeric score exists, and surface
+  `coolingMentionCount` and `confidence` alongside the number.
 
-The formula must be documented in product-facing copy and unit tests. Any
-formula change requires recomputation for affected listings.
+The formula and its confidence band must be documented in product-facing copy and
+unit tests. Re-scoring runs against stored cooling classifications without
+re-extraction. Any formula change requires recomputation for affected listings.
 
 ### Editor Score and Trust Tier Logic
 
@@ -262,6 +321,21 @@ Derived badge precedence for a single primary badge:
 The UI may show supplemental labels, but it must not imply Handpicked equals
 Editor Verified.
 
+### Guest/Editor Conflict Rule
+
+Guest Signal and Editor Score are never blended, but the UI must reconcile them
+when they disagree. Map each to a 0-100 cooling reference:
+
+- Editor Score reference: `verified_cold` 85, `verified_adequate` 65,
+  `verified_weak` 40, `verified_broken` 15.
+- A conflict exists when both values are present and
+  `abs(guestSignalScore - editorReference) >= 35`.
+
+On conflict, set a derived `signalsConflict` flag (a boolean for filtering and
+telemetry, never a stored blended score), show both scores unchanged, and render
+a reconciliation explanation that gives the direct human check (Editor Verified)
+narrative precedence for worst-case summer heat. FR-027 references this rule.
+
 ## Drizzle Schema Plan
 
 ### Enums
@@ -271,7 +345,10 @@ Editor Verified.
 - `guest_signal_status`: `unverified`, `scored`
 - `trust_tier`: `unverified`, `scored`, `handpicked`, `editor_verified`
 - `listing_status`: `active`, `disputed`
-- `review_source`: `scraped`, `insider`, `anonymous`, `editorial`
+- `review_source`: `scraped`, `insider`, `anonymous`, `editorial`. `scraped` is a
+  legacy label that for the lawful launch denotes imported review text (manual
+  research or a permitted API such as Google Places), not live scraping; a
+  provenance-neutral rename is a tracked follow-up.
 - `cooling_sentiment`: `positive`, `negative`, `neutral`
 - `contributor_type`: `anonymous`, `insider`
 - `contribution_vote`: `confirm_cold`, `dispute_weak`, `broken`
@@ -284,11 +361,22 @@ Editor Verified.
 - `cities`: `id`, `name`, `country`, `slug`, `lat`, `lng`, `is_active`.
 - `listings`: `id`, `name`, `type`, `lat`, `lng`, `city_id`, `address`,
   `source`, `source_url`, `affiliate_url`, `ac_type`, `guest_signal_score`,
-  `guest_signal_status`, `editor_score`, `is_handpicked`,
-  `editor_verified_at`, `trust_tier`, `evidence_summary`,
-  `review_count_analyzed`, `last_seeded_at`, `status`, timestamps.
-- `review_signals`: `id`, `listing_id`, `source`, `raw_excerpt`,
-  `cooling_sentiment`, `ac_type_hint`, `weight`, `extracted_at`.
+  `guest_signal_status`, `guest_signal_confidence`, `editor_score`,
+  `is_handpicked`, `editor_verified_at`, `trust_tier`, `evidence_summary`,
+  `image_url`, `image_attribution`, `photo_gallery`, `review_count_analyzed`,
+  `last_seeded_at`, `status`, timestamps.
+- `raw_reviews` (immutable raw layer): `id`, `listing_id`, `source`,
+  `source_url`, `content_hash`, `raw_text` (paraphrased, never verbatim
+  third-party text), `authored_at` (date), `collected_at`.
+  `UNIQUE (listing_id, content_hash)`.
+- `cooling_extractions` (cache layer): `raw_review_id`, `extraction_version`,
+  `mentions_cooling`, `cooling_sentiment`, `ac_type_hint`, `confidence`, `model`,
+  `extracted_at`. Primary key `(raw_review_id, extraction_version)`.
+- `review_signals` (derived layer over `raw_reviews` joined to
+  `cooling_extractions` where `mentions_cooling=true`): `id`, `listing_id`,
+  `source`, `raw_excerpt`, `cooling_sentiment`, `ac_type_hint`, `authored_at`,
+  `extracted_at`. The prior stored `weight` column is dropped; scoring recomputes
+  weights from source, recency, and seasonality.
 - `user_contributions`: `id`, `listing_id`, `contributor_type`, `user_id`,
   `session_id`, `vote`, `comment`, `created_at`.
 - `users`: `id`, `email`, `role`, `created_at`, `verified_at`.
@@ -300,22 +388,28 @@ Indexes:
 
 - `cities.slug`, `cities.is_active`
 - `listings.city_id`, `listings.status`, `listings.type`, `listings.trust_tier`,
-  `listings.guest_signal_score`
-- `review_signals.listing_id`, `review_signals.source`,
-  `review_signals.extracted_at`
+  `listings.guest_signal_score`, plus bounding-box btrees `(city_id, lat)` and
+  `(city_id, lng)` for the map hot path
+- `raw_reviews.listing_id`, `raw_reviews.content_hash`,
+  `review_signals.listing_id`, `review_signals.source`,
+  `review_signals.authored_at`
 - `user_contributions.listing_id`, `user_contributions.session_id`,
   `user_contributions.user_id`
 - `click_events.listing_id`, `click_events.created_at`
 
-Constraints:
+Constraints (enforced as database CHECK constraints; the initial migration
+omitted these and a follow-up migration must add them):
 
-- Guest Signal score nullable unless status is `scored`.
-- Guest Signal score within 0-100 when present.
-- Editor Score nullable unless editor verification exists.
-- Anonymous contributions require `session_id`; Insider contributions require
-  `user_id`.
+- `CHECK (guest_signal_score IS NULL OR guest_signal_score BETWEEN 0 AND 100)`.
+- `CHECK ((guest_signal_status = 'scored') = (guest_signal_score IS NOT NULL))`.
+- `CHECK (editor_score IS NULL OR editor_verified_at IS NOT NULL)`.
+- `CHECK ((contributor_type='anonymous' AND session_id IS NOT NULL AND user_id IS NULL)
+  OR (contributor_type='insider' AND user_id IS NOT NULL))`.
 - Public listing query requires evidence summary, review signal, Handpicked, or
-  Editor Verified status.
+  Editor Verified status (enforced in the query and an architecture test, not a
+  row-level constraint).
+- No blended Guest/Editor column may exist; a guard test fails if an
+  overall/blended/combined/merged cooling-score field appears (Law VIII).
 
 ## Auth Approach
 
@@ -360,6 +454,37 @@ Click flow:
 
 No public booking action appears when a listing lacks a valid affiliate URL.
 
+## UX and Design System
+
+The visual contract lives in `specs/001-minty-stays/design.md` and supersedes the
+current CSS where they differ. What the plan commits to:
+
+- **Cold Index scale**: one shared thermal scale (glacier-blue cold to red hot)
+  applied to each score independently via `coldIndex(score)` and
+  `coldIndexForEditorScore(...)`. These are the only score-to-color functions and
+  never take both scores, preserving the no-blend law structurally.
+- **Dual Cold Gauge**: Guest Signal and Editor Score render as two visually
+  distinct gauges sharing the scale, never merged; confidence is shown visually.
+- **Themes**: light "Daybreak Frost" and dark "Night Frost" via CSS variables on
+  `[data-theme]`, defaulting to `prefers-color-scheme` with a manual toggle.
+- **Typography**: Fraunces (display) + Inter (body) + IBM Plex Mono (numerals)
+  loaded through `next/font`, replacing raw Georgia.
+- **Photography**: `image_url` + `image_attribution` + `photo_gallery` on
+  listings; a branded thermal placeholder renders when no licensed image exists,
+  so no unlicensed imagery is ever fetched.
+- **Map**: branded frost (light) and night (dark) MapLibre styles via
+  `MAP_STYLE_URL` / `MAP_STYLE_URL_DARK`, band-colored pins encoding one labeled
+  score, hollow markers for unrated listings, low-zoom clustering.
+- **Conflict**: the Guest/Editor Conflict Rule surfaces a reconciliation panel
+  between the two gauges (never a merge).
+- **Mobile**: map with a draggable bottom-sheet list; filters in a sheet.
+- **Quality bar**: WCAG AA on all band tints in both themes, color never the sole
+  encoder of a score, `prefers-reduced-motion` respected, Lighthouse >= 90.
+
+New dependencies: `next/font` families (Fraunces, Inter, IBM Plex Mono). No new
+runtime libraries are required for theming, gauges, or pins (CSS plus existing
+MapLibre).
+
 ## Environment Configuration
 
 - `DATABASE_URL`
@@ -374,6 +499,7 @@ No public booking action appears when a listing lacks a valid affiliate URL.
 - `AFFILIATE_BOOKING_PARTNER_ID`
 - `AFFILIATE_DEFAULT_PROVIDER`
 - `MAP_STYLE_URL`
+- `MAP_STYLE_URL_DARK`
 - `SESSION_COOKIE_NAME`
 
 ## Deployment Plan

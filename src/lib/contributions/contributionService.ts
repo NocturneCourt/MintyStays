@@ -45,6 +45,8 @@ export async function submitAnonymousContribution(
     };
   }
 
+  const now = new Date();
+
   return db.transaction(async (tx) => {
     await tx.insert(userContributions).values({
       listingId: input.listingId,
@@ -61,7 +63,8 @@ export async function submitAnonymousContribution(
       coolingSentiment: contributionToSentiment(input.vote),
       acTypeHint: undefined,
       weight: "1.25",
-      extractedAt: new Date(),
+      authoredAt: now,
+      extractedAt: now,
     });
 
     const listingStatus = isDisputeVote(input.vote) ? "disputed" : "active";
@@ -71,7 +74,7 @@ export async function submitAnonymousContribution(
         .update(listings)
         .set({
           status: "disputed",
-          updatedAt: new Date(),
+          updatedAt: now,
         })
         .where(eq(listings.id, input.listingId));
     }

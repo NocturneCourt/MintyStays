@@ -79,9 +79,9 @@ function toListingRow(
   const guestSignal = calculateGuestSignal(
     seedListing.reviewExcerpts.map((excerpt) => ({
       source: "scraped",
-      sentiment: inferCoolingSentiment(excerpt),
-      rawExcerpt: excerpt,
-      extractedAt: new Date(),
+      sentiment: inferCoolingSentiment(excerpt.text),
+      rawExcerpt: excerpt.text,
+      authoredAt: parseSeedDate(excerpt.authoredAt),
     })),
   );
 
@@ -98,6 +98,7 @@ function toListingRow(
     acType: seedListing.acType,
     guestSignalScore: guestSignal.score,
     guestSignalStatus: guestSignal.status,
+    guestSignalConfidence: guestSignal.confidence,
     editorScore: seedListing.editorial?.editorScore,
     isHandpicked: seedListing.editorial?.handpicked ?? false,
     editorVerifiedAt,
@@ -118,10 +119,15 @@ function toReviewSignals(seedListing: SeedListing, listingId: string): NewReview
   return seedListing.reviewExcerpts.map((excerpt) => ({
     listingId,
     source: "scraped",
-    rawExcerpt: excerpt,
-    coolingSentiment: inferCoolingSentiment(excerpt),
+    rawExcerpt: excerpt.text,
+    coolingSentiment: inferCoolingSentiment(excerpt.text),
     acTypeHint: seedListing.acType,
     weight: "1.00",
+    authoredAt: parseSeedDate(excerpt.authoredAt),
     extractedAt: new Date(),
   }));
+}
+
+function parseSeedDate(value?: string) {
+  return value ? new Date(`${value}T12:00:00Z`) : null;
 }

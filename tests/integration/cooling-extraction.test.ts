@@ -79,6 +79,7 @@ function excerpt(id: string, rawExcerpt: string): SeededExtractionExcerpt {
     id,
     listingId: "listing-1",
     rawExcerpt,
+    authoredAt: new Date("2026-06-10T12:00:00Z"),
     acTypeHint: null,
   };
 }
@@ -137,7 +138,7 @@ function createMemoryExtractionStore(excerpts: SeededExtractionExcerpt[]) {
           source: "scraped",
           sentiment: signal.coolingSentiment,
           rawExcerpt: signal.rawExcerpt,
-          extractedAt: signal.extractedAt,
+          authoredAt: signal.authoredAt,
         })),
         now,
       );

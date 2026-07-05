@@ -26,9 +26,9 @@ test("keeps auth-gated surfaces unavailable while public site works", async ({
   expect(editorUpdate.status()).toBe(404);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Lisbon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lisbon", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" })).toHaveCount(0);
-  await expect(page.locator(".pin")).toHaveCount(3);
+  await expect(page.locator(".pin")).toHaveCount(6);
 
   await page.goto("/listings/avenida-chill-hotel-1");
   await expect(

@@ -16,6 +16,7 @@ export function mapDbListingToPublicListing(listing: Listing): PublicListing {
     acType: listing.acType ?? undefined,
     guestSignalScore: listing.guestSignalScore,
     guestSignalStatus: listing.guestSignalStatus,
+    guestSignalConfidence: listing.guestSignalConfidence,
     editorScore: listing.editorScore,
     trustTier: listing.trustTier,
     evidenceSummary:

@@ -19,16 +19,34 @@
       "affiliateBaseUrl": "https://example.com/book/avenida-chill-hotel",
       "acType": "central",
       "evidenceSummary": "Multiple recent guests describe rooms cooling quickly at night, with no reports of throttled central AC in the seed set.",
+      "evidenceSource": {
+        "label": "Manual launch seed",
+        "url": "https://example.com/avenida-chill-hotel",
+        "observedAt": "2026-06-26",
+        "paraphrased": true
+      },
       "editorial": {
         "handpicked": true,
         "editorVerified": true,
         "editorScore": "verified_cold"
       },
       "reviewExcerpts": [
-        "The room got properly cold after a hot day outside.",
-        "Strong air conditioning and easy temperature control.",
-        "Excellent cooling overnight even during a warm week.",
-        "Central AC kept the room cool without noise."
+        {
+          "text": "The room got properly cold after a hot day outside.",
+          "authoredAt": "2026-06-15"
+        },
+        {
+          "text": "Strong air conditioning and easy temperature control.",
+          "authoredAt": "2026-06-11"
+        },
+        {
+          "text": "Excellent cooling overnight even during a warm week.",
+          "authoredAt": "2026-05-28"
+        },
+        {
+          "text": "Central AC kept the room cool without noise.",
+          "authoredAt": "2026-05-19"
+        }
       ]
     },
     {
@@ -42,13 +60,28 @@
       "affiliateBaseUrl": "https://example.com/book/alfama-cool-loft",
       "acType": "split",
       "evidenceSummary": "Seed evidence points to a dedicated split unit that guests could control directly.",
+      "evidenceSource": {
+        "label": "Manual launch seed",
+        "url": "https://example.com/alfama-cool-loft",
+        "observedAt": "2026-06-26",
+        "paraphrased": true
+      },
       "editorial": {
         "handpicked": true
       },
       "reviewExcerpts": [
-        "The split AC was powerful and cooled the loft fast.",
-        "Great cooling in the bedroom with the door closed.",
-        "A little warm in the kitchen, but the sleeping area stayed cool."
+        {
+          "text": "The split AC was powerful and cooled the loft fast.",
+          "authoredAt": "2026-06-08"
+        },
+        {
+          "text": "Great cooling in the bedroom with the door closed.",
+          "authoredAt": "2026-05-31"
+        },
+        {
+          "text": "A little warm in the kitchen, but the sleeping area stayed cool.",
+          "authoredAt": "2026-05-20"
+        }
       ]
     },
     {
@@ -62,10 +95,98 @@
       "affiliateBaseUrl": "https://example.com/book/baixa-breeze-rooms",
       "acType": "portable",
       "evidenceSummary": "Early evidence is limited but includes one useful cooling report and editorial monitoring.",
+      "evidenceSource": {
+        "label": "Manual launch seed",
+        "url": "https://example.com/baixa-breeze-rooms",
+        "observedAt": "2026-06-26",
+        "paraphrased": true
+      },
       "editorial": {},
       "reviewExcerpts": [
-        "The portable AC helped, but it took a long time to cool the room.",
-        "Room was comfortable once the unit had been running."
+        {
+          "text": "The portable AC helped, but it took a long time to cool the room.",
+          "authoredAt": "2026-06-02"
+        },
+        {
+          "text": "Room was comfortable once the unit had been running.",
+          "authoredAt": "2026-05-23"
+        }
+      ]
+    },
+    {
+      "name": "Lisbon Chillout Apartments",
+      "type": "str",
+      "lat": 38.7138785,
+      "lng": -9.135416,
+      "address": "Rua das Farinhas 28",
+      "source": "manual_booking_public",
+      "sourceUrl": "https://www.booking.com/reviews/pt/hotel/lisbon-chillout-apartments-lisboa12.html",
+      "affiliateBaseUrl": "https://www.booking.com/hotel/pt/lisbon-chillout-apartments-lisboa12.html",
+      "evidenceSummary": "Public Booking review snippets include two paraphrased apartment cooling themes: air-con worked well during a heatwave and the unit had ample air conditioning. Fewer than three cooling mentions means this stays Unverified.",
+      "evidenceSource": {
+        "label": "Booking.com public review page",
+        "url": "https://www.booking.com/reviews/pt/hotel/lisbon-chillout-apartments-lisboa12.html",
+        "observedAt": "2026-06-29",
+        "paraphrased": true
+      },
+      "editorial": {},
+      "reviewExcerpts": [
+        {
+          "text": "Apartment air-con worked well during hot weather.",
+          "authoredAt": "2025-06-16"
+        },
+        {
+          "text": "Apartment had ample air conditioning.",
+          "authoredAt": "2025-05-29"
+        }
+      ]
+    },
+    {
+      "name": "LSA Príncipe Real by Numa",
+      "type": "str",
+      "lat": 38.7161109,
+      "lng": -9.1444232,
+      "address": "Rua das Taipas 12",
+      "source": "manual_booking_public",
+      "sourceUrl": "https://www.booking.com/reviews/pt/hotel/lsa-principe-real-by-numa.html",
+      "affiliateBaseUrl": "https://www.booking.com/hotel/pt/lsa-principe-real-by-numa.html",
+      "evidenceSummary": "Public Booking review material includes a paraphrased apartment AC theme: the air conditioning worked well. Fewer than three cooling mentions means this stays Unverified.",
+      "evidenceSource": {
+        "label": "Booking.com public review page",
+        "url": "https://www.booking.com/reviews/pt/hotel/lsa-principe-real-by-numa.html",
+        "observedAt": "2026-06-29",
+        "paraphrased": true
+      },
+      "editorial": {},
+      "reviewExcerpts": [
+        {
+          "text": "Apartment AC worked well.",
+          "authoredAt": "2026-06-05"
+        }
+      ]
+    },
+    {
+      "name": "Charm Flats",
+      "type": "str",
+      "lat": 38.7182129,
+      "lng": -9.1456197,
+      "address": "Praça da Alegria 50",
+      "source": "manual_booking_public",
+      "sourceUrl": "https://www.booking.com/reviews/pt/hotel/charm-flats.html",
+      "affiliateBaseUrl": "https://www.booking.com/hotel/pt/charm-flats.html",
+      "evidenceSummary": "Public Booking review material includes a paraphrased hot-weather AC theme: air conditioning was strong enough for hot weather. Fewer than three cooling mentions means this stays Unverified.",
+      "evidenceSource": {
+        "label": "Booking.com public review page",
+        "url": "https://www.booking.com/reviews/pt/hotel/charm-flats.html",
+        "observedAt": "2026-06-29",
+        "paraphrased": true
+      },
+      "editorial": {},
+      "reviewExcerpts": [
+        {
+          "text": "Air conditioning was strong enough for hot weather.",
+          "authoredAt": "2026-06-03"
+        }
       ]
     }
   ]

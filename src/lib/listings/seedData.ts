@@ -26,11 +26,12 @@ export function getSeedListings(): PublicListing[] {
     const guestSignal = calculateGuestSignal(
       listing.reviewExcerpts.map((excerpt) => ({
         source: "scraped",
-        sentiment: inferCoolingSentiment(excerpt),
-        rawExcerpt: excerpt,
-        extractedAt: new Date("2026-06-01T12:00:00Z"),
+        sentiment: inferCoolingSentiment(excerpt.text),
+        rawExcerpt: excerpt.text,
+        authoredAt: parseSeedDate(excerpt.authoredAt),
       })),
       new Date("2026-06-26T12:00:00Z"),
+      { cityLat: city.lat },
     );
     const editorVerifiedAt = listing.editorial?.editorVerified
       ? new Date("2026-06-20T12:00:00Z")
@@ -56,6 +57,7 @@ export function getSeedListings(): PublicListing[] {
       acType: listing.acType,
       guestSignalScore: guestSignal.score,
       guestSignalStatus: guestSignal.status,
+      guestSignalConfidence: guestSignal.confidence,
       editorScore: listing.editorial?.editorScore ?? null,
       trustTier,
       evidenceSummary:
@@ -64,6 +66,10 @@ export function getSeedListings(): PublicListing[] {
       reviewCountAnalyzed: listing.reviewExcerpts.length,
     };
   });
+}
+
+function parseSeedDate(value?: string) {
+  return value ? new Date(`${value}T12:00:00Z`) : null;
 }
 
 function slugify(value: string) {

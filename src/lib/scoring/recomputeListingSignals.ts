@@ -12,7 +12,7 @@ type ReviewSignalRow = {
   source: string;
   rawExcerpt: string;
   coolingSentiment: "positive" | "negative" | "neutral";
-  extractedAt: Date;
+  authoredAt: Date | null;
 };
 
 export async function recomputeListingSignals(
@@ -25,7 +25,7 @@ export async function recomputeListingSignals(
       source: reviewSignals.source,
       rawExcerpt: reviewSignals.rawExcerpt,
       coolingSentiment: reviewSignals.coolingSentiment,
-      extractedAt: reviewSignals.extractedAt,
+      authoredAt: reviewSignals.authoredAt,
     })
     .from(reviewSignals)
     .where(eq(reviewSignals.listingId, listingId));
@@ -53,6 +53,7 @@ export async function recomputeListingSignals(
     .set({
       guestSignalScore: guestSignal.score,
       guestSignalStatus: guestSignal.status,
+      guestSignalConfidence: guestSignal.confidence,
       reviewCountAnalyzed: guestSignal.coolingMentionCount,
       trustTier: deriveTrustTier({
         guestSignalStatus: guestSignal.status,
@@ -77,7 +78,7 @@ export function toGuestSignalInput(row: ReviewSignalRow): GuestSignalInput[] {
       source: row.source,
       sentiment: row.coolingSentiment,
       rawExcerpt: row.rawExcerpt,
-      extractedAt: row.extractedAt,
+      authoredAt: row.authoredAt,
     },
   ];
 }

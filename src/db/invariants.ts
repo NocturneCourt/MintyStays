@@ -4,6 +4,7 @@ export function validateListingInvariant(listing: Pick<
   NewListing,
   | "guestSignalScore"
   | "guestSignalStatus"
+  | "guestSignalConfidence"
   | "editorScore"
   | "editorVerifiedAt"
   | "evidenceSummary"
@@ -13,9 +14,17 @@ export function validateListingInvariant(listing: Pick<
     throw new Error("Unverified listings must not have a Guest Signal number");
   }
 
+  if (listing.guestSignalStatus === "unverified" && listing.guestSignalConfidence) {
+    throw new Error("Unverified listings must not have a Guest Signal confidence");
+  }
+
   if (listing.guestSignalStatus === "scored") {
     if (listing.guestSignalScore == null) {
       throw new Error("Scored listings require a Guest Signal number");
+    }
+
+    if (!listing.guestSignalConfidence) {
+      throw new Error("Scored listings require a Guest Signal confidence");
     }
 
     if (listing.guestSignalScore < 0 || listing.guestSignalScore > 100) {

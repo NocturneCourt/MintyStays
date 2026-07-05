@@ -12,7 +12,7 @@ describe("ManualImportAdapter", () => {
       path: "src/db/seed/minty-launch-city.json",
     });
 
-    expect(listings).toHaveLength(3);
+    expect(listings).toHaveLength(6);
     expect(listings[0].city?.name).toBe("Lisbon");
     expect(listings[0].editorial?.editorVerified).toBe(true);
   });
@@ -38,7 +38,55 @@ describe("ManualImportAdapter", () => {
       citySlug: "lisbon",
       name: "Test Stay",
       acType: "split",
-      reviewExcerpts: ["Cold room", "Strong AC"],
+      reviewExcerpts: [{ text: "Cold room" }, { text: "Strong AC" }],
+    });
+  });
+
+  it("imports CSV review authored dates", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mintystays-"));
+    const path = join(dir, "seed.csv");
+    await writeFile(
+      path,
+      [
+        "name,type,lat,lng,source,review_excerpts,review_authored_dates",
+        "Test Stay,hotel,38.7,-9.1,manual,Cold room|Strong AC,2026-06-20|2026-06-18",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const listings = await new ManualImportAdapter().importCity({
+      citySlug: "lisbon",
+      path,
+    });
+
+    expect(listings[0].reviewExcerpts).toEqual([
+      { text: "Cold room", authoredAt: "2026-06-20" },
+      { text: "Strong AC", authoredAt: "2026-06-18" },
+    ]);
+  });
+
+  it("imports CSV evidence provenance fields", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mintystays-"));
+    const path = join(dir, "seed.csv");
+    await writeFile(
+      path,
+      [
+        "name,type,lat,lng,source,evidence_source_label,evidence_source_url,evidence_observed_at,evidence_is_paraphrased,review_excerpts",
+        "Test Stay,hotel,38.7,-9.1,manual,Booking.com,https://example.com/listing,2026-06-27,true,Cools quickly|No broken AC theme",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const listings = await new ManualImportAdapter().importCity({
+      citySlug: "lisbon",
+      path,
+    });
+
+    expect(listings[0].evidenceSource).toEqual({
+      label: "Booking.com",
+      url: "https://example.com/listing",
+      observedAt: "2026-06-27",
+      paraphrased: true,
     });
   });
 

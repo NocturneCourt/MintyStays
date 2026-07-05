@@ -1,7 +1,14 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useRef } from "react";
+import { BadgeCheck } from "lucide-react";
 import maplibregl, { type Map } from "maplibre-gl";
+import {
+  coldIndex,
+  coldIndexForEditorScore,
+  type ColdIndexResult,
+} from "@/lib/design/coldIndex";
 import type { PublicCity, PublicListing } from "@/lib/listings/types";
 
 export function ListingMap({
@@ -46,7 +53,19 @@ export function ListingMap({
     if (selectedId) {
       const selected = listings.find((listing) => listing.id === selectedId);
       if (selected) {
-        map.flyTo({ center: [selected.lng, selected.lat], zoom: 14, essential: true });
+        const prefersReducedMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+
+        if (prefersReducedMotion) {
+          map.jumpTo({ center: [selected.lng, selected.lat], zoom: 14 });
+        } else {
+          map.flyTo({
+            center: [selected.lng, selected.lat],
+            zoom: 14,
+            essential: true,
+          });
+        }
       }
     }
   }, [listings, onSelect, selectedId]);
@@ -57,20 +76,33 @@ export function ListingMap({
       <div className="static-pin-layer" aria-label="Map pins">
         {listings.map((listing) => {
           const position = positions[listing.id];
+          const pin = getPinPresentation(listing);
 
           return (
             <button
               key={listing.id}
               type="button"
-              className={`pin ${listing.id === selectedId ? "is-selected" : ""}`}
+              className={`pin ${pin.className} ${
+                listing.id === selectedId ? "is-selected" : ""
+              }`}
               style={{
                 left: `${position.left}%`,
                 top: `${position.top}%`,
+                ...pin.style,
               }}
               aria-label={`Select ${listing.name}`}
               onClick={() => onSelect(listing.id)}
             >
-              <span>{listing.guestSignalScore ?? "?"}</span>
+              {pin.kind === "guest" ? (
+                <span>{listing.guestSignalScore}</span>
+              ) : pin.kind === "editor" ? (
+                <BadgeCheck size={17} aria-hidden="true" />
+              ) : (
+                <span className="pin-dot" aria-hidden="true" />
+              )}
+              {pin.kind !== "unrated" ? (
+                <small aria-hidden="true">{pin.kind === "guest" ? "G" : "E"}</small>
+              ) : null}
             </button>
           );
         })}
@@ -91,14 +123,14 @@ function projectListings(listings: PublicListing[]) {
 
   return Object.fromEntries(
     listings.map((listing) => {
-      const x = 15 + ((listing.lng - minLng) / lngRange) * 70;
-      const y = 15 + (1 - (listing.lat - minLat) / latRange) * 70;
+      const x = 18 + ((listing.lng - minLng) / lngRange) * 68;
+      const y = 18 + (1 - (listing.lat - minLat) / latRange) * 56;
 
       return [
         listing.id,
         {
-          left: clamp(x, 12, 88),
-          top: clamp(y, 12, 88),
+          left: clamp(x, 18, 86),
+          top: clamp(y, 18, 74),
         },
       ];
     }),
@@ -107,4 +139,51 @@ function projectListings(listings: PublicListing[]) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+type PinPresentation =
+  | {
+      kind: "guest";
+      className: string;
+      style: CSSProperties;
+    }
+  | {
+      kind: "editor";
+      className: string;
+      style: CSSProperties;
+    }
+  | {
+      kind: "unrated";
+      className: string;
+      style: CSSProperties;
+    };
+
+function getPinPresentation(listing: PublicListing): PinPresentation {
+  if (listing.guestSignalScore != null) {
+    return createPin("guest", coldIndex(listing.guestSignalScore));
+  }
+
+  if (listing.editorScore) {
+    return createPin("editor", coldIndexForEditorScore(listing.editorScore));
+  }
+
+  return {
+    kind: "unrated",
+    className: "is-unrated",
+    style: {},
+  };
+}
+
+function createPin(
+  kind: "guest" | "editor",
+  index: ColdIndexResult,
+): PinPresentation {
+  return {
+    kind,
+    className: `is-${kind} band-${index.band}`,
+    style: {
+      "--pin-color": index.solid,
+      "--pin-soft": index.soft,
+    } as CSSProperties,
+  };
 }

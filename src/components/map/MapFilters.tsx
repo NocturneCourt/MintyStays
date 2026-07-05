@@ -6,7 +6,7 @@ export function MapFilters({ filters }: { filters: ListingFilters }) {
   return (
     <form className="filter-bar" action="/" aria-label="Listing filters">
       <label className="filter-field">
-        <span>Guest Signal</span>
+        <span>Min Guest Signal</span>
         <input
           type="number"
           name="score"
@@ -38,7 +38,7 @@ export function MapFilters({ filters }: { filters: ListingFilters }) {
         <SlidersHorizontal size={15} aria-hidden="true" />
         Apply
       </button>
-      <Link href="/">
+      <Link className="filter-reset" href="/">
         <RotateCcw size={15} aria-hidden="true" />
         Reset
       </Link>

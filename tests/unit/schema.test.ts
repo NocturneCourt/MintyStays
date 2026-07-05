@@ -10,6 +10,7 @@ describe("schema invariants", () => {
       validateListingInvariant({
         guestSignalStatus: "unverified",
         guestSignalScore: 82,
+        guestSignalConfidence: null,
         editorScore: null,
         editorVerifiedAt: null,
         evidenceSummary: "Guests say it cooled quickly.",
@@ -23,6 +24,7 @@ describe("schema invariants", () => {
       validateListingInvariant({
         guestSignalStatus: "unverified",
         guestSignalScore: null,
+        guestSignalConfidence: null,
         editorScore: null,
         editorVerifiedAt: new Date("2026-06-26T12:00:00Z"),
         evidenceSummary: "Checked by an editor.",
@@ -36,6 +38,7 @@ describe("schema invariants", () => {
       validateListingInvariant({
         guestSignalStatus: "unverified",
         guestSignalScore: null,
+        guestSignalConfidence: null,
         editorScore: null,
         editorVerifiedAt: null,
         evidenceSummary: "",

@@ -1,5 +1,26 @@
 import { z } from "zod";
 
+const evidenceSourceSchema = z.object({
+  label: z.string().min(1).optional(),
+  url: z.string().url().optional(),
+  observedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD for observedAt")
+    .optional(),
+  paraphrased: z.boolean().optional(),
+});
+
+const reviewExcerptSchema = z.preprocess(
+  (value) => (typeof value === "string" ? { text: value } : value),
+  z.object({
+    text: z.string().min(1),
+    authoredAt: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD for authoredAt")
+      .optional(),
+  }),
+);
+
 export const seedListingSchema = z.object({
   citySlug: z.string().min(1),
   city: z
@@ -21,6 +42,7 @@ export const seedListingSchema = z.object({
   affiliateBaseUrl: z.string().url().optional(),
   acType: z.enum(["split", "central", "portable", "none"]).optional(),
   evidenceSummary: z.string().optional(),
+  evidenceSource: evidenceSourceSchema.optional(),
   editorial: z
     .object({
       handpicked: z.boolean().optional(),
@@ -35,7 +57,7 @@ export const seedListingSchema = z.object({
         .optional(),
     })
     .optional(),
-  reviewExcerpts: z.array(z.string().min(1)).default([]),
+  reviewExcerpts: z.array(reviewExcerptSchema).default([]),
 });
 
 export const seedFileSchema = z.object({

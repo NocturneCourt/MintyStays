@@ -67,7 +67,7 @@ export function ListingDetail({
             <p className="score-note">
               Guest Signal is computed from review and contribution data. Editor
               Score is a separate human verification layer and is never averaged
-              into Guest Signal.
+              into Guest Signal. <Link href="/guest-signal">See the formula</Link>.
             </p>
           </section>
         </div>

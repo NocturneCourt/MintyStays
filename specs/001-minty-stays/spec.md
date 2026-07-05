@@ -183,6 +183,14 @@ Signal.
   editorial status.
 - Affiliate URLs may be unavailable for a seeded listing; the detail view must
   avoid presenting a dead booking action.
+- A "freezing cold in January" review must not carry the same weight as a summer
+  cooling review when scoring August cooling performance.
+- A listing scored from a few cooling mentions inside a large review set must
+  display the mention count and low confidence, not a bare number.
+- Under the lawful manual-research path most listings launch Unverified and rely
+  on editorial status; the map must remain useful in that state.
+- Guest Signal and Editor Score can point in opposite directions; the listing
+  must show both with a reconciliation explanation and never average them.
 
 ## Requirements
 
@@ -201,9 +209,15 @@ Signal.
   review signals, anonymous contributions, and Insider contributions.
 - **FR-007**: Guest Signal MUST show no number and use "Unverified" when fewer
   than three cooling mentions exist.
-- **FR-008**: Guest Signal MUST include recency weighting, a hard penalty for any
-  broken or non-working AC mention in the trailing 12 months, and a
-  low-sample-size discount.
+- **FR-008**: Guest Signal MUST weight signals by recency and by review
+  seasonality, both measured from review AUTHORED date, apply a recency- and
+  season-weighted penalty for broken or non-working AC mentions authored in the
+  trailing 12 months, and shrink small samples via a Bayesian prior.
+- **FR-008a**: Every numeric Guest Signal MUST display the cooling mention count
+  it was computed from and a confidence band (high, moderate, or low).
+- **FR-008b**: Re-scoring MUST be possible without re-extraction; raw review data
+  and derived cooling classifications MUST be stored in separate, independently
+  re-runnable layers.
 - **FR-009**: The Guest Signal formula MUST be documented in a way a non-editorial
   stakeholder can understand and audit.
 - **FR-010**: Editor Score MUST be displayed separately and MUST NOT be averaged,
@@ -240,17 +254,43 @@ Signal.
   listings or review evidence.
 - **FR-026**: The system MUST not show public listings that lack both cooling
   evidence and editorial status.
+- **FR-027**: When Guest Signal and Editor Score conflict (as defined by the
+  Guest/Editor Conflict Rule in plan.md), the listing MUST surface a "signals
+  disagree" state and a reconciliation explanation. Neither score may be averaged
+  or hidden.
+- **FR-028**: Handpicked and Editor Verified MUST be visually distinct on a card
+  at a glance: only Editor Verified carries the verified accent and check icon;
+  Handpicked is presented as taste, not evidence.
+- **FR-029**: The UI MUST express every score on a shared Cold Index thermal
+  scale (glacier-blue cold to red hot) applied to each score independently, and
+  MUST NOT render a blended or combined cold value. See `design.md`.
+- **FR-030**: Listing cards and detail views MUST be photography-forward, using a
+  licensed image when available and a branded thermal placeholder otherwise, and
+  MUST never fetch or display unlicensed third-party imagery.
+- **FR-031**: The interface MUST provide a light and a dark theme, default to the
+  visitor's system preference, and expose a manual toggle.
+- **FR-032**: Guest Signal confidence MUST be expressed visually, not only as
+  text, so a low-confidence score is visibly less certain than a high-confidence
+  score of the same value.
+- **FR-033**: Map pins MUST encode exactly one labeled score on the Cold Index
+  scale, render evidence-only listings as a deliberate unrated marker rather than
+  an error glyph, and cluster at low zoom.
+- **FR-034**: The redesign MUST preserve every trust-model guarantee: distinct
+  Guest Signal and Editor Score gauges, distinct Handpicked and Editor Verified
+  treatments, the conflict reconciliation state, and no empty pins.
 
 ### Key Entities
 
 - **City**: A launch or expansion market with name, country, slug, map center,
   and active state.
 - **Listing**: A hotel or short-term rental with location, source, booking link,
-  AC metadata, score states, editorial states, evidence summary, and public
-  status.
+  AC metadata, score states, editorial states, evidence summary, an optional
+  licensed image with attribution (branded thermal placeholder otherwise), and
+  public status.
 - **Review Signal**: A cooling-related interpretation of a review or report,
-  including source, sentiment, AC hint, weight, evidence excerpt, and extraction
-  time.
+  including source, sentiment, AC hint, evidence excerpt, AUTHORED date, and
+  extraction version. Weights are recomputed at scoring time from source,
+  recency, and seasonality, not stored on the signal.
 - **User Contribution**: A confirm, dispute, or broken-AC report from an
   anonymous visitor or Insider Member.
 - **User**: An authenticated Insider Member or Editor with verified account state.
@@ -279,13 +319,30 @@ Signal.
   without changing the Guest Signal calculation.
 - **SC-009**: Outbound booking clicks are recorded for every affiliate action
   before the traveler leaves MintyStays.
+- **SC-010**: A first-time visitor can tell "cold" from "runs warm" for a visible
+  listing from color alone in under 5 seconds, with the number and label
+  confirming.
+- **SC-011**: 100% of score colorings are per-score; no view renders a blended or
+  averaged cold value.
+- **SC-012**: The map page scores Lighthouse performance and accessibility >= 90
+  at MVP listing volume, with no cumulative layout shift from image loads.
+- **SC-013**: Light and dark themes both meet WCAG AA text contrast on all Cold
+  Index tints.
 
 ## Assumptions
 
 - The first launch city will be selected outside this specification and stored
   as configuration.
-- Initial inventory can come from manual CSV or JSON import with lawful evidence
-  excerpts or paraphrased cooling themes.
+- Initial inventory comes from manual CSV or JSON import with paraphrased cooling
+  themes. Because lawful research yields few cooling mentions per listing, the
+  launch leans on Editor Verified, Handpicked, and evidence summaries; numeric
+  Guest Signal is expected to be sparse at launch. Review text with authored
+  dates is sourced from APIs that permit it (for example Google Places), not
+  scraping.
+- The `scraped` source label is a legacy name that for the lawful launch denotes
+  imported review text (manually researched or sourced from a permitted API such
+  as Google Places), never live scraping. A provenance-neutral rename is a
+  tracked follow-up.
 - Editorial content may exist before editor login is enabled because seeded data
   can set editorial fields.
 - The public MVP does not need user profiles, saved lists, payments, or general

@@ -5,7 +5,8 @@ test("listing detail keeps Guest Signal and Editor Score separate", async ({ pag
 
   await expect(page.getByRole("heading", { name: "Avenida Chill Hotel" })).toBeVisible();
   await expect(page.getByText("Guest Signal").first()).toBeVisible();
-  await expect(page.getByText("56/100")).toBeVisible();
+  await expect(page.getByText("68/100")).toBeVisible();
+  await expect(page.getByText("4 cooling mentions / low confidence")).toBeVisible();
   await expect(page.getByText("Editor Score").first()).toBeVisible();
   await expect(page.getByText("Verified Cold")).toBeVisible();
   await expect(page.getByText("never averaged into Guest Signal")).toBeVisible();

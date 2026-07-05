@@ -1,7 +1,9 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { ArrowRight, Building2, Home, MapPin, Snowflake } from "lucide-react";
 import Link from "next/link";
+import { coldIndex } from "@/lib/design/coldIndex";
 import type { PublicListing } from "@/lib/listings/types";
 import { ScoreRows } from "./ScoreRows";
 import { TrustBadge } from "./TrustBadge";
@@ -15,16 +17,28 @@ export function ListingCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const cardStyle = getCardStyle(listing);
+
   return (
-    <article className={`listing-card ${selected ? "is-selected" : ""}`}>
+    <article
+      className={`listing-card ${selected ? "is-selected" : ""}`}
+      style={cardStyle}
+    >
       <button
         type="button"
         className="listing-select"
         aria-pressed={selected}
         onClick={onSelect}
       >
-        <div className="listing-card-top">
+        <div className="listing-visual">
+          <span className="cold-chip">
+            {listing.guestSignalScore != null
+              ? `${listing.guestSignalScore} Guest Signal`
+              : "Unverified"}
+          </span>
           <TrustBadge tier={listing.trustTier} />
+        </div>
+        <div className="listing-card-top">
           <span className="listing-type-pill">
             {listing.type === "hotel" ? (
               <Building2 size={14} aria-hidden="true" />
@@ -57,6 +71,16 @@ export function ListingCard({
       </Link>
     </article>
   );
+}
+
+function getCardStyle(listing: PublicListing): CSSProperties {
+  if (listing.guestSignalScore == null) return {};
+  const index = coldIndex(listing.guestSignalScore);
+
+  return {
+    "--band-color": index.solid,
+    "--band-soft": index.soft,
+  } as CSSProperties;
 }
 
 function formatAcType(acType: NonNullable<PublicListing["acType"]>) {

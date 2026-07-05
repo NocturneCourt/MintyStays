@@ -10,7 +10,7 @@ test("filters by listing type and trust tier", async ({ page }) => {
 });
 
 test("filters by minimum Guest Signal score", async ({ page }) => {
-  await page.goto("/?score=55&type=&trustTier=");
+  await page.goto("/?score=66&type=&trustTier=");
 
   await expect(page.getByRole("heading", { name: "Avenida Chill Hotel" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Alfama Cool Loft" })).toHaveCount(0);

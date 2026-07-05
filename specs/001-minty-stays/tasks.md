@@ -33,16 +33,21 @@ commands.
 ManualImportAdapter first so the app can work before any scraper exists.
 
 - [x] T006 Define Drizzle enums and tables for City, Listing, ReviewSignal, UserContribution, User, ClickEvent, and Auth.js support in `src/db/schema.ts`
+- [x] T006a Add CHECK constraints (score range, status-score consistency, editor_score requires editor_verified_at, contributor identity) in `src/db/schema.ts` and a follow-up migration
+- [ ] T006b Split raw extraction from scoring: add `raw_reviews` and `cooling_extractions` tables with `content_hash`, `authored_at`, and `extraction_version`; make `review_signals` a derived layer and drop the dead `weight` column in `src/db/schema.ts`
 - [x] T007 Add Drizzle database client and migration configuration in `src/db/client.ts` and `drizzle.config.ts`
 - [x] T008 Generate and verify the initial PostgreSQL migration in `src/db/migrations/`
 - [x] T009 [P] Add schema constraint tests for score nullability, contribution identity, and editorial field separation in `tests/unit/schema.test.ts`
+- [x] T009a [P] Add a no-blend guard test that fails if an overall/blended/combined/merged cooling-score field appears in the schema, DTOs, or any public API response in `tests/unit/no-blend-guard.test.ts`
 - [x] T010 Define the ListingSourceAdapter contract in `src/lib/sources/ListingSourceAdapter.ts`
 - [x] T011 Implement ManualImportAdapter for CSV and JSON seed files in `src/lib/sources/ManualImportAdapter.ts`
 - [x] T012 Add ScraperAdapter as a non-functional replaceable stub in `src/lib/sources/ScraperAdapter.ts`
 - [x] T013 Add an import service that depends only on ListingSourceAdapter in `src/lib/sources/importListings.ts`
 - [x] T014 [P] Add an architecture test proving no core scoring, UI, route, or affiliate module imports ScraperAdapter in `tests/unit/source-boundary.test.ts`
 - [x] T015 Add launch-city seed fixtures with editorial fields and cooling excerpts in `src/db/seed/minty-launch-city.json`
+- [x] T015a Add per-review authored dates to seed fixtures and the seed contract so recency and seasonality are computable, updating `src/db/seed/minty-launch-city.json`, `src/db/seed/research-intake-template.csv`, `src/db/seed/manual-import-template.csv`, and `src/lib/sources/ManualImportAdapter.ts`
 - [x] T016 Implement the transparent Guest Signal formula in `src/lib/scoring/guestSignalFormula.ts`
+- [x] T016a Rework Guest Signal: authored-date recency (half-life decay), seasonality weight, Wilson confidence band, and a soft recency/season-weighted broken penalty; remove the double-counting `sampleMultiplier`; add unit tests for seasonal down-weighting and confidence output in `src/lib/scoring/guestSignalFormula.ts` and `tests/unit/guest-signal-formula.test.ts`
 - [x] T017 [P] Add Guest Signal formula tests for unverified threshold, recency weighting, broken-AC penalty, and low-sample discount in `tests/unit/guest-signal-formula.test.ts`
 - [x] T018 Implement trust-tier derivation with separate Handpicked and Editor Verified semantics in `src/lib/scoring/trustTier.ts`
 - [x] T019 [P] Add trust-tier tests proving Handpicked and Editor Verified do not collapse into one meaning in `tests/unit/trust-tier.test.ts`
@@ -64,6 +69,7 @@ status.
 
 - [x] T021 [US1] Implement active city loading by configured slug in `src/lib/cities/getActiveCity.ts`
 - [x] T022 [US1] Implement public listing query that excludes empty pins in `src/lib/listings/getPublicListings.ts`
+- [x] T022a [US1] Replace whole-city load with a bounding-box query using `(city_id, lat)` and `(city_id, lng)` btrees; push type, trust-tier, score, and no-empty-pin filters into SQL in `src/lib/listings/getPublicListings.ts`
 - [x] T023 [P] [US1] Create the MapLibre listing map component in `src/components/map/ListingMap.tsx`
 - [x] T024 [P] [US1] Create the synchronized side-list shell in `src/components/listing/ListingList.tsx`
 - [x] T025 [P] [US1] Create listing card layout with separate Guest Signal and Editor Score slots in `src/components/listing/ListingCard.tsx`
@@ -102,13 +108,17 @@ evidence, click booking, and confirm a ClickEvent is recorded before redirect.
 
 - [x] T033 [US3] Implement listing detail query with evidence, score states, AC type, and affiliate URL in `src/lib/listings/getListingDetail.ts`
 - [x] T034 [P] [US3] Create ScoreRows component that cannot render a blended score in `src/components/listing/ScoreRows.tsx`
+- [x] T034a [P] [US3] Show effective sample size (cooling mention count) and a confidence band on Guest Signal, and render the score bar only when scored, in `src/components/listing/ScoreRows.tsx`
 - [x] T035 [P] [US3] Create TrustBadge component with distinct Unverified, Scored, Handpicked, and Editor Verified labels in `src/components/listing/TrustBadge.tsx`
 - [x] T036 [P] [US3] Create listing detail component in `src/components/listing/ListingDetail.tsx`
+- [ ] T036a [US3] Add a Guest-vs-Editor conflict reconciliation panel and a "signals disagree" card state, and make Handpicked vs Editor Verified visually distinct (accent and check icon only on Editor Verified) in `src/components/listing/ListingDetail.tsx`, `src/components/listing/ListingCard.tsx`, and `src/components/listing/TrustBadge.tsx`
 - [x] T037 [US3] Build public listing detail route in `src/app/(public)/listings/[id]/page.tsx`
+- [x] T037a [US3] Update the public Guest Signal explainer to match the amended formula (authored-date recency, seasonality down-weighting, soft capped broken penalty, Bayesian prior, and the high/moderate/low confidence band shown beside every numeric score) in `src/app/(public)/guest-signal/page.tsx`
 - [x] T038 [US3] Implement AffiliateLinkBuilder in `src/lib/affiliate/AffiliateLinkBuilder.ts`
 - [x] T039 [US3] Implement affiliate click route that records ClickEvent and redirects in `src/app/api/affiliate-click/route.ts`
 - [x] T040 [P] [US3] Add unit tests for tracked affiliate URL construction in `tests/unit/affiliate-link-builder.test.ts`
 - [x] T041 [P] [US3] Add browser test proving score rows are separate and click tracking runs in `tests/e2e/listing-detail-affiliate.spec.ts`
+- [ ] T041a [P] [US3] Add a test proving the Guest/Editor Conflict Rule renders a "signals disagree" state with a reconciliation explanation, shows both scores, and averages or hides neither (FR-027, Law VIII) in `tests/e2e/score-conflict.spec.ts`
 
 **Checkpoint**: User Story 3 completes the public MVP loop from discovery to
 booking exit.
@@ -145,9 +155,10 @@ JSON parsing, ReviewSignal creation, malformed output quarantine, and scoring
 recalculation.
 
 - [x] T047 [P] Implement safe Claude JSON parser with code-fence stripping in `src/lib/extraction/parseClaudeJson.ts`
-- [x] T048 Implement cooling extractor using Anthropic SDK and `claude-sonnet-4-6` in `src/lib/extraction/coolingExtractor.ts`
-- [x] T049 Implement extraction job that creates ReviewSignal rows from seeded excerpts in `src/lib/extraction/runExtraction.ts`
-- [x] T050 Implement score recomputation after extraction in `src/lib/scoring/recomputeListingSignals.ts`
+- [ ] T048 Cooling extractor with keyword pre-filter, cache-by-content_hash at the current `extraction_version`, batched LLM calls, and a JSON repair retry before quarantine, in `src/lib/extraction/coolingExtractor.ts`
+- [ ] T049 Extraction job writes immutable `raw_reviews` and `cooling_extractions` (no destructive delete-and-replace) and projects cooling rows into `review_signals` in `src/lib/extraction/runExtraction.ts`
+- [ ] T049a Populate `authored_at` for API-sourced reviews (for example Google Places) during ingestion in `src/lib/extraction/runExtraction.ts` (manual-seed authored dates are covered by T015a)
+- [ ] T050 Score recomputation reads `cooling_extractions` directly so re-scoring never re-invokes the LLM, in `src/lib/scoring/recomputeListingSignals.ts`
 - [x] T051 [P] Add parser tests for valid JSON, fenced JSON, invalid JSON, and schema mismatch in `tests/unit/parse-claude-json.test.ts`
 - [x] T052 [P] Add extraction integration test with mocked Anthropic responses in `tests/integration/cooling-extraction.test.ts`
 
@@ -242,6 +253,33 @@ release action.
 
 ---
 
+## Phase 13: UX Revamp (Design System)
+
+**Purpose**: Elevate the public experience to the `design.md` visual contract
+without changing the trust model. Presentation and optional imagery only.
+
+**Prerequisites**: `specs/001-minty-stays/design.md`.
+
+- [x] T077 Add design tokens for both themes (Daybreak Frost light, Night Frost dark) as CSS variables with `[data-theme]` and a `prefers-color-scheme` default in `src/app/globals.css`
+- [x] T078 [P] Load Fraunces, Inter, and IBM Plex Mono via `next/font` and wire the font CSS variables in `src/app/layout.tsx`
+- [x] T079 Implement the Cold Index scale as the only score-to-color source: `coldIndex(score)` and `coldIndexForEditorScore(...)` returning band/solid/soft/label, with unit tests, in `src/lib/design/coldIndex.ts` and `tests/unit/cold-index.test.ts`
+- [ ] T080 Add `image_url`, `image_attribution`, and `photo_gallery` to listings plus a migration, and a branded thermal placeholder renderer for missing images, in `src/db/schema.ts` and `src/components/listing/ListingImage.tsx`
+- [ ] T081 [P] Seed licensed images where lawful and leave the rest null for the placeholder, in `src/db/seed/minty-launch-city.json` and the seed contract
+- [x] T082 Build the Dual Cold Gauge (separate Guest Signal and Editor Score gauges, shared scale, visual confidence, never merged) — implemented inside `src/components/listing/ScoreRows.tsx` on top of `coldIndex` and the gauge token CSS, with the no-blend guard test extended over `coldIndex.ts` and `ScoreRows.tsx` in `tests/unit/no-blend-guard.test.ts`
+- [ ] T083 Redesign the photo-forward listing card with Cold Index chip, trust badge, mini gauge, and conflict pill in `src/components/listing/ListingCard.tsx`
+- [x] T084 [P] Implement the theme toggle (light/dark, persisted, system default) in `src/components/app/ThemeToggle.tsx` and the topbar in `src/app/(public)/page.tsx`
+- [ ] T085 Ship branded frost and night MapLibre styles and band-colored pins (single labeled score, hollow unrated marker, selected fly-to, low-zoom clustering) in `src/components/map/ListingMap.tsx` with `MAP_STYLE_URL` / `MAP_STYLE_URL_DARK`
+- [ ] T086 Redesign the filter rail with segmented Stay Type and Trust Tier controls and a thermal Min Cold Index slider in `src/components/map/MapFilters.tsx`
+- [ ] T087 Redesign the detail page: hero image, sticky score panel, reconciliation panel between the gauges, fact tiles, gallery, and restyled contribution form in `src/components/listing/ListingDetail.tsx`
+- [ ] T088 [P] Implement the mobile draggable bottom-sheet list over the map and a filters sheet in `src/components/map/MapExplorer.tsx`
+- [ ] T089 [P] Add empty-state art, skeleton loaders, and motion (card lift, pin fly-to, sheet drag) gated by `prefers-reduced-motion` across the public components
+- [ ] T090 [P] Add accessibility and visual checks (WCAG AA band tints in both themes, keyboard nav for pins and filters, no color-only score encoding, Lighthouse budget) in `tests/e2e/ux-accessibility.spec.ts`
+
+**Checkpoint**: The public map, cards, and detail match `design.md` in both
+themes with the trust model intact.
+
+---
+
 ## Dependencies & Execution Order
 
 - **Setup**: T001-T005 have no dependencies.
@@ -250,13 +288,20 @@ release action.
 - **Filters**: T028-T032 depend on public listing query and map/list UI.
 - **Detail and Affiliate**: T033-T041 depend on public listings and schema.
 - **Auth Foundations**: T042-T046 depend on schema, but not on public map work.
-- **Extraction**: T047-T052 depend on ReviewSignal schema and scoring services.
+- **Extraction**: T047-T052 depend on the `raw_reviews`/`cooling_extractions`
+  schema and scoring services. Extraction is NOT on the day-one critical path:
+  the launch map runs on seeded `evidence_summary` plus editorial status, so seed
+  quality (T015) is the real launch gate.
 - **Anonymous Contributions**: T053-T058 depend on listing detail and scoring.
 - **Insider Reports**: T059-T062 depend on auth foundations and contributions.
 - **Editorial Layer**: T063-T067 depends on schema, roles, and trust-tier logic.
 - **Public Deploy Readiness**: T068-T071 depends on public MVP and contribution
   flow.
-- **Final Auth Feature-Flag Wiring**: T072-T076 must remain last.
+- **Final Auth Feature-Flag Wiring**: T072-T076 must remain last among the MVP
+  build phases.
+- **UX Revamp**: T077-T090 depend on the public UI (US1-US3) and `design.md`.
+  They are presentation-only except the imagery columns (T080) and must preserve
+  the two-score, trust-tier, confidence, conflict, and no-empty-pin guarantees.
 
 ## Parallel Opportunities
 

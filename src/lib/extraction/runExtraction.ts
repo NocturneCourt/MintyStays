@@ -17,6 +17,7 @@ export type SeededExtractionExcerpt = {
   id: string;
   listingId: string;
   rawExcerpt: string;
+  authoredAt?: Date | null;
   acTypeHint?: AcType | null;
 };
 
@@ -27,6 +28,7 @@ export type ExtractedScrapedSignal = {
   coolingSentiment: "positive" | "negative" | "neutral";
   acTypeHint?: AcType;
   weight: "1.00";
+  authoredAt?: Date | null;
   extractedAt: Date;
 };
 
@@ -144,6 +146,7 @@ export function createDrizzleExtractionStore(db: DbClient): ExtractionStore {
           id: reviewSignals.id,
           listingId: reviewSignals.listingId,
           rawExcerpt: reviewSignals.rawExcerpt,
+          authoredAt: reviewSignals.authoredAt,
           acTypeHint: reviewSignals.acTypeHint,
         })
         .from(reviewSignals)
@@ -200,6 +203,7 @@ function toReviewSignal(
     coolingSentiment: extracted.sentiment,
     acTypeHint: extracted.ac_type_hint ?? excerpt.acTypeHint ?? undefined,
     weight: "1.00",
+    authoredAt: excerpt.authoredAt ?? null,
     extractedAt: now,
   };
 }

@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -24,6 +25,11 @@ export const acTypeEnum = pgEnum("ac_type", [
 export const guestSignalStatusEnum = pgEnum("guest_signal_status", [
   "unverified",
   "scored",
+]);
+export const guestSignalConfidenceEnum = pgEnum("guest_signal_confidence", [
+  "low",
+  "moderate",
+  "high",
 ]);
 export const trustTierEnum = pgEnum("trust_tier", [
   "unverified",
@@ -120,6 +126,7 @@ export const listings = pgTable(
     guestSignalStatus: guestSignalStatusEnum("guest_signal_status")
       .notNull()
       .default("unverified"),
+    guestSignalConfidence: guestSignalConfidenceEnum("guest_signal_confidence"),
     editorScore: editorScoreEnum("editor_score"),
     isHandpicked: boolean("is_handpicked").notNull().default(false),
     editorVerifiedAt: timestamp("editor_verified_at", { withTimezone: true }),
@@ -133,10 +140,28 @@ export const listings = pgTable(
   },
   (table) => ({
     cityIdx: index("listings_city_id_idx").on(table.cityId),
+    cityLatIdx: index("listings_city_lat_idx").on(table.cityId, table.lat),
+    cityLngIdx: index("listings_city_lng_idx").on(table.cityId, table.lng),
     statusIdx: index("listings_status_idx").on(table.status),
     typeIdx: index("listings_type_idx").on(table.type),
     trustTierIdx: index("listings_trust_tier_idx").on(table.trustTier),
     scoreIdx: index("listings_guest_signal_score_idx").on(table.guestSignalScore),
+    guestSignalRangeCheck: check(
+      "listings_guest_signal_range_check",
+      sql`${table.guestSignalScore} IS NULL OR ${table.guestSignalScore} BETWEEN 0 AND 100`,
+    ),
+    guestSignalStatusCheck: check(
+      "listings_guest_signal_status_check",
+      sql`(${table.guestSignalStatus} = 'scored') = (${table.guestSignalScore} IS NOT NULL)`,
+    ),
+    guestSignalConfidenceCheck: check(
+      "listings_guest_signal_confidence_check",
+      sql`(${table.guestSignalStatus} = 'scored') = (${table.guestSignalConfidence} IS NOT NULL)`,
+    ),
+    editorVerificationCheck: check(
+      "listings_editor_verification_check",
+      sql`${table.editorScore} IS NULL OR ${table.editorVerifiedAt} IS NOT NULL`,
+    ),
   }),
 );
 
@@ -152,11 +177,13 @@ export const reviewSignals = pgTable(
     coolingSentiment: coolingSentimentEnum("cooling_sentiment").notNull(),
     acTypeHint: acTypeEnum("ac_type_hint"),
     weight: numeric("weight", { precision: 5, scale: 2 }).notNull(),
+    authoredAt: timestamp("authored_at", { withTimezone: true }),
     extractedAt: timestamp("extracted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     listingIdx: index("review_signals_listing_id_idx").on(table.listingId),
     sourceIdx: index("review_signals_source_idx").on(table.source),
+    authoredAtIdx: index("review_signals_authored_at_idx").on(table.authoredAt),
     extractedAtIdx: index("review_signals_extracted_at_idx").on(table.extractedAt),
   }),
 );
@@ -182,6 +209,17 @@ export const userContributions = pgTable(
     anonymousOnceIdx: uniqueIndex("user_contributions_listing_session_idx").on(
       table.listingId,
       table.sessionId,
+    ),
+    contributorIdentityCheck: check(
+      "user_contributions_identity_check",
+      sql`(
+        ${table.contributorType} = 'anonymous'
+        AND ${table.sessionId} IS NOT NULL
+        AND ${table.userId} IS NULL
+      ) OR (
+        ${table.contributorType} = 'insider'
+        AND ${table.userId} IS NOT NULL
+      )`,
     ),
   }),
 );
