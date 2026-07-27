@@ -61,7 +61,7 @@ describe("anonymous contribution integration", () => {
         now,
       },
       {
-        async recomputeListingSignals(_db, listingId, recomputeAt) {
+        async recomputeListingSignals(_db, listingId, recomputeAt = now) {
           state.recomputeCalls.push({ listingId, now: recomputeAt });
           return calculateGuestSignal(baselineSignals, recomputeAt);
         },
@@ -110,7 +110,7 @@ describe("anonymous contribution integration", () => {
         now,
       },
       {
-        async recomputeListingSignals(_db, id, recomputeAt) {
+        async recomputeListingSignals(_db, id, recomputeAt = now) {
           state.recomputeCalls.push({ listingId: id, now: recomputeAt });
           return calculateGuestSignal(
             [
@@ -146,7 +146,7 @@ describe("anonymous contribution integration", () => {
       async recomputeListingSignals(
         _db: DbClient,
         listingId: string,
-        recomputeAt: Date,
+        recomputeAt: Date = now,
       ) {
         state.recomputeCalls.push({ listingId, now: recomputeAt });
         return calculateGuestSignal(baselineSignals, recomputeAt);
