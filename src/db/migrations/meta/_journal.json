@@ -22,6 +22,20 @@
       "when": 1782688119906,
       "tag": "0002_smiling_mathemanic",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783640821009,
+      "tag": "0003_late_william_stryker",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785216000000,
+      "tag": "0004_dispute_review_needed",
+      "breakpoints": true
     }
   ]
 }

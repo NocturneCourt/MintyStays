@@ -19,7 +19,9 @@ export type InsiderReportInput = {
 
 export type InsiderReportResult = {
   status: "created" | "duplicate";
-  listingStatus: "active" | "disputed";
+  /** Public visibility status after write. Disputes no longer auto-hide. */
+  listingStatus: "active";
+  reviewNeeded: boolean;
   guestSignal?: Awaited<ReturnType<typeof recomputeListingSignals>>;
 };
 
@@ -49,12 +51,13 @@ export async function submitInsiderReport(
     )
     .limit(1);
 
-  const listingStatus = isDisputeVote(input.vote) ? "disputed" : "active";
+  const reviewNeeded = isDisputeVote(input.vote);
 
   if (existing.length) {
     return {
       status: "duplicate",
-      listingStatus,
+      listingStatus: "active",
+      reviewNeeded,
     };
   }
 
@@ -76,16 +79,16 @@ export async function submitInsiderReport(
       rawExcerpt: insiderReportToExcerpt(input),
       coolingSentiment: contributionToSentiment(input.vote),
       acTypeHint: undefined,
-      weight: "2.50",
       authoredAt: now,
       extractedAt: now,
     });
 
-    if (listingStatus === "disputed") {
+    // Disputes flag for editor review; listing stays public (active) until an editor acts.
+    if (reviewNeeded) {
       await tx
         .update(listings)
         .set({
-          status: "disputed",
+          reviewNeeded: true,
           updatedAt: now,
         })
         .where(eq(listings.id, input.listingId));
@@ -96,7 +99,8 @@ export async function submitInsiderReport(
 
   return {
     status: "created",
-    listingStatus,
+    listingStatus: "active",
+    reviewNeeded,
     guestSignal: await recompute(db, input.listingId, now),
   };
 }

@@ -1,20 +1,26 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import type { DbClient } from "@/db/client";
 import { validateContributionInvariant } from "@/db/invariants";
 import { listings, reviewSignals, userContributions } from "@/db/schema";
 
 export type ContributionVote = "confirm_cold" | "dispute_weak" | "broken";
 
+export const MAX_DISPUTES_PER_LISTING_IP_PER_DAY = 3;
+
 export type AnonymousContributionInput = {
   listingId: string;
   sessionId: string;
   vote: ContributionVote;
   comment?: string;
+  clientIp?: string | null;
+  now?: Date;
 };
 
 export type ContributionResult = {
-  status: "created" | "duplicate";
-  listingStatus: "active" | "disputed";
+  status: "created" | "duplicate" | "rate_limited";
+  /** Public visibility status after write. Disputes no longer auto-hide. */
+  listingStatus: "active";
+  reviewNeeded: boolean;
 };
 
 export async function submitAnonymousContribution(
@@ -26,6 +32,9 @@ export async function submitAnonymousContribution(
     sessionId: input.sessionId,
     userId: null,
   });
+
+  const now = input.now ?? new Date();
+  const reviewNeeded = isDisputeVote(input.vote);
 
   const existing = await db
     .select({ id: userContributions.id })
@@ -41,17 +50,33 @@ export async function submitAnonymousContribution(
   if (existing.length) {
     return {
       status: "duplicate",
-      listingStatus: isDisputeVote(input.vote) ? "disputed" : "active",
+      listingStatus: "active",
+      reviewNeeded,
     };
   }
 
-  const now = new Date();
+  if (reviewNeeded && input.clientIp) {
+    const limited = await isDisputeRateLimited(db, {
+      listingId: input.listingId,
+      clientIp: input.clientIp,
+      now,
+    });
+
+    if (limited) {
+      return {
+        status: "rate_limited",
+        listingStatus: "active",
+        reviewNeeded: true,
+      };
+    }
+  }
 
   return db.transaction(async (tx) => {
     await tx.insert(userContributions).values({
       listingId: input.listingId,
       contributorType: "anonymous",
       sessionId: input.sessionId,
+      clientIp: input.clientIp ?? null,
       vote: input.vote,
       comment: input.comment,
     });
@@ -62,28 +87,49 @@ export async function submitAnonymousContribution(
       rawExcerpt: contributionToExcerpt(input),
       coolingSentiment: contributionToSentiment(input.vote),
       acTypeHint: undefined,
-      weight: "1.25",
       authoredAt: now,
       extractedAt: now,
     });
 
-    const listingStatus = isDisputeVote(input.vote) ? "disputed" : "active";
-
-    if (listingStatus === "disputed") {
+    // Disputes flag for editor review; listing stays public (active) until an editor acts.
+    if (reviewNeeded) {
       await tx
         .update(listings)
         .set({
-          status: "disputed",
+          reviewNeeded: true,
           updatedAt: now,
         })
         .where(eq(listings.id, input.listingId));
     }
 
     return {
-      status: "created",
-      listingStatus,
+      status: "created" as const,
+      listingStatus: "active" as const,
+      reviewNeeded,
     };
   });
+}
+
+export async function isDisputeRateLimited(
+  db: Pick<DbClient, "select">,
+  input: { listingId: string; clientIp: string; now?: Date },
+) {
+  const now = input.now ?? new Date();
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+  const recentDisputes = await db
+    .select({ id: userContributions.id })
+    .from(userContributions)
+    .where(
+      and(
+        eq(userContributions.listingId, input.listingId),
+        eq(userContributions.clientIp, input.clientIp),
+        inArray(userContributions.vote, ["dispute_weak", "broken"]),
+        gte(userContributions.createdAt, dayAgo),
+      ),
+    );
+
+  return recentDisputes.length >= MAX_DISPUTES_PER_LISTING_IP_PER_DAY;
 }
 
 export function isDisputeVote(vote: ContributionVote) {
@@ -105,4 +151,15 @@ export function contributionToExcerpt(input: AnonymousContributionInput) {
         : "Anonymous visitor reported broken AC.";
 
   return input.comment?.trim() ? `${label} ${input.comment.trim()}` : label;
+}
+
+export function getClientIpFromHeaders(headers: Headers): string | null {
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  const realIp = headers.get("x-real-ip")?.trim();
+  return realIp || null;
 }

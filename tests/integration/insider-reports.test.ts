@@ -87,6 +87,7 @@ describe("Insider reports", () => {
 
     expect(result.status).toBe("created");
     expect(result.listingStatus).toBe("active");
+    expect(result.reviewNeeded).toBe(false);
     expect(state.contributions).toMatchObject([
       {
         contributorType: "insider",
@@ -99,7 +100,6 @@ describe("Insider reports", () => {
       {
         source: "insider",
         coolingSentiment: "positive",
-        weight: "2.50",
       },
     ]);
     expect(state.reviewSignals[0]?.rawExcerpt).toContain(
@@ -108,7 +108,10 @@ describe("Insider reports", () => {
     expect(result.guestSignal?.status).toBe("scored");
     expect(anonymousComparison.status).toBe("scored");
 
-    if (result.guestSignal?.status !== "scored" || anonymousComparison.status !== "scored") {
+    if (
+      result.guestSignal?.status !== "scored" ||
+      anonymousComparison.status !== "scored"
+    ) {
       throw new Error("Expected scored comparison");
     }
 
@@ -144,16 +147,20 @@ describe("Insider reports", () => {
       }),
     ).resolves.toMatchObject({
       status: "created",
-      listingStatus: "disputed",
+      listingStatus: "active",
+      reviewNeeded: true,
     });
     await expect(submitInsiderReport(db, input)).resolves.toEqual({
       status: "duplicate",
-      listingStatus: "disputed",
+      listingStatus: "active",
+      reviewNeeded: true,
     });
 
     expect(state.contributions).toHaveLength(1);
     expect(state.reviewSignals).toHaveLength(1);
-    expect(state.listingUpdates).toMatchObject([{ status: "disputed" }]);
+    // Disputes flag review; they must not auto-hide the listing from public.
+    expect(state.listingUpdates).toMatchObject([{ reviewNeeded: true }]);
+    expect(state.listingUpdates[0]).not.toHaveProperty("status", "disputed");
   });
 });
 

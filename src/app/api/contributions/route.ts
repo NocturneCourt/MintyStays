@@ -7,6 +7,7 @@ import {
   hasFallbackContribution,
 } from "@/lib/contributions/sessionIdentity";
 import {
+  getClientIpFromHeaders,
   isDisputeVote,
   submitAnonymousContribution,
 } from "@/lib/contributions/contributionService";
@@ -35,13 +36,17 @@ export async function POST(request: NextRequest) {
   }
 
   const { sessionId } = getOrCreateAnonymousSession(request);
+  const clientIp = getClientIpFromHeaders(request.headers);
+  const reviewNeeded = isDisputeVote(parsed.data.vote);
 
   if (!process.env.DATABASE_URL || !isUuid(parsed.data.listingId)) {
     const duplicate = hasFallbackContribution(request, parsed.data.listingId);
     const response = NextResponse.json(
       {
         status: duplicate ? "duplicate" : "created",
-        listingStatus: isDisputeVote(parsed.data.vote) ? "disputed" : "active",
+        // Disputes stay public; only flag for review (no auto-hide).
+        listingStatus: "active",
+        reviewNeeded,
         persisted: false,
       },
       { status: duplicate ? 409 : 201 },
@@ -61,7 +66,22 @@ export async function POST(request: NextRequest) {
     sessionId,
     vote: parsed.data.vote,
     comment: parsed.data.comment,
+    clientIp,
   });
+
+  if (result.status === "rate_limited") {
+    const response = NextResponse.json(
+      {
+        ...result,
+        error: "Too many disputes for this listing from your network today.",
+        persisted: true,
+      },
+      { status: 429 },
+    );
+    attachAnonymousSessionCookie(response, sessionId);
+    return response;
+  }
+
   const response = NextResponse.json(
     {
       ...result,

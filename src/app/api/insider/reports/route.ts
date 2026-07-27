@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     {
       status: result.status,
       listingStatus: result.listingStatus,
+      reviewNeeded: result.reviewNeeded,
       guestSignal: result.guestSignal,
     },
     { status: result.status === "duplicate" ? 409 : 201 },
