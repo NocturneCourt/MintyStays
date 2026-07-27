@@ -1,3 +1,7 @@
+import {
+  ServiceUnavailableError,
+  shouldFailClosedOnDbError,
+} from "@/lib/http/errors";
 import type { ListingFilters } from "./listingFilters";
 import { mapDbListingToPublicListing } from "./mapDbListing";
 import { getSeedListings } from "./seedData";
@@ -34,66 +38,78 @@ export async function getPublicListings(filters: ListingFilters = {}) {
 async function loadListings(filters: ListingFilters): Promise<PublicListing[]> {
   const launchCitySlug = process.env.LAUNCH_CITY_SLUG ?? "lisbon";
 
-  if (process.env.DATABASE_URL) {
-    try {
-      const [
-        { db },
-        { cities, listings },
-        { and, eq, gte, lte, ne, or, sql },
-      ] = await Promise.all([
-        import("@/db/client"),
-        import("@/db/schema"),
-        import("drizzle-orm"),
-      ]);
-
-      const [city] = await db
-        .select({ id: cities.id, lat: cities.lat, lng: cities.lng })
-        .from(cities)
-        .where(eq(cities.slug, launchCitySlug))
-        .limit(1);
-
-      if (!city) {
-        return [];
-      }
-
-      const bounds = filters.bounds ?? defaultBounds(city.lat, city.lng);
-      const conditions = [
-        eq(listings.cityId, city.id),
-        eq(listings.status, "active"),
-        gte(listings.lat, bounds.minLat),
-        lte(listings.lat, bounds.maxLat),
-        gte(listings.lng, bounds.minLng),
-        lte(listings.lng, bounds.maxLng),
-        or(
-          sql`${listings.evidenceSummary} IS NOT NULL AND btrim(${listings.evidenceSummary}) <> ''`,
-          ne(listings.trustTier, "unverified"),
-        ),
-      ];
-
-      if (filters.type) {
-        conditions.push(eq(listings.type, filters.type));
-      }
-
-      if (filters.trustTier) {
-        conditions.push(eq(listings.trustTier, filters.trustTier));
-      }
-
-      if (filters.minScore != null) {
-        conditions.push(gte(listings.guestSignalScore, filters.minScore));
-      }
-
-      const rows = await db
-        .select({ listing: listings })
-        .from(listings)
-        .where(and(...conditions));
-
-      return rows.map((row) => mapDbListingToPublicListing(row.listing));
-    } catch (error) {
-      console.warn("Falling back to seed listing data", error);
+  if (!process.env.DATABASE_URL) {
+    if (shouldFailClosedOnDbError()) {
+      throw new ServiceUnavailableError(
+        "DATABASE_URL is required in production",
+      );
     }
+    return getSeedListings();
   }
 
-  return getSeedListings();
+  try {
+    const [
+      { db },
+      { cities, listings },
+      { and, eq, gte, lte, ne, or, sql },
+    ] = await Promise.all([
+      import("@/db/client"),
+      import("@/db/schema"),
+      import("drizzle-orm"),
+    ]);
+
+    const [city] = await db
+      .select({ id: cities.id, lat: cities.lat, lng: cities.lng })
+      .from(cities)
+      .where(eq(cities.slug, launchCitySlug))
+      .limit(1);
+
+    if (!city) {
+      return [];
+    }
+
+    const bounds = filters.bounds ?? defaultBounds(city.lat, city.lng);
+    const conditions = [
+      eq(listings.cityId, city.id),
+      eq(listings.status, "active"),
+      gte(listings.lat, bounds.minLat),
+      lte(listings.lat, bounds.maxLat),
+      gte(listings.lng, bounds.minLng),
+      lte(listings.lng, bounds.maxLng),
+      or(
+        sql`${listings.evidenceSummary} IS NOT NULL AND btrim(${listings.evidenceSummary}) <> ''`,
+        ne(listings.trustTier, "unverified"),
+      ),
+    ];
+
+    if (filters.type) {
+      conditions.push(eq(listings.type, filters.type));
+    }
+
+    if (filters.trustTier) {
+      conditions.push(eq(listings.trustTier, filters.trustTier));
+    }
+
+    if (filters.minScore != null) {
+      conditions.push(gte(listings.guestSignalScore, filters.minScore));
+    }
+
+    const rows = await db
+      .select({ listing: listings })
+      .from(listings)
+      .where(and(...conditions));
+
+    return rows.map((row) => mapDbListingToPublicListing(row.listing));
+  } catch (error) {
+    if (error instanceof ServiceUnavailableError) {
+      throw error;
+    }
+
+    console.error("Public listings database query failed", error);
+    throw new ServiceUnavailableError(
+      "Listing data is temporarily unavailable",
+    );
+  }
 }
 
 function defaultBounds(lat: number, lng: number) {

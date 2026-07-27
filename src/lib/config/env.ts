@@ -8,6 +8,7 @@ const envSchema = z.object({
   EMAIL_PROVIDER_API_KEY: z.string().optional(),
   LAUNCH_CITY_SLUG: z.string().min(1).default("lisbon"),
   MAP_STYLE_URL: z.string().url().optional(),
+  NEXTAUTH_URL: z.string().url().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
 });
 
@@ -30,8 +31,8 @@ export function checkLaunchEnv(
     EMAIL_PROVIDER_API_KEY: blankToUndefined(env["EMAIL_PROVIDER_API_KEY"]),
     LAUNCH_CITY_SLUG: env["LAUNCH_CITY_SLUG"] || "lisbon",
     MAP_STYLE_URL: blankToUndefined(env["MAP_STYLE_URL"]),
-    NEXT_PUBLIC_SITE_URL:
-      env["NEXT_PUBLIC_SITE_URL"] || "http://localhost:3000",
+    NEXTAUTH_URL: blankToUndefined(env["NEXTAUTH_URL"]),
+    NEXT_PUBLIC_SITE_URL: env["NEXT_PUBLIC_SITE_URL"] || "http://localhost:3000",
   };
   const parsed = envSchema.safeParse(normalized);
   const errors = parsed.success
@@ -41,7 +42,9 @@ export function checkLaunchEnv(
   const warnings: string[] = [];
 
   if (!value.DATABASE_URL) {
-    warnings.push("DATABASE_URL is not set; public pages will use seed fallback data.");
+    warnings.push(
+      "DATABASE_URL is not set; public pages use local seed data only outside production.",
+    );
   }
 
   if (value.AUTH_ENABLED === "true") {
@@ -51,6 +54,10 @@ export function checkLaunchEnv(
 
     if (!value.AUTH_SECRET) {
       errors.push("AUTH_SECRET is required when AUTH_ENABLED=true.");
+    }
+
+    if (!value.NEXTAUTH_URL) {
+      errors.push("NEXTAUTH_URL is required when AUTH_ENABLED=true.");
     }
 
     if (!value.EMAIL_FROM || !value.EMAIL_PROVIDER_API_KEY) {

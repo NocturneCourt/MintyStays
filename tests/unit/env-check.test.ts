@@ -11,7 +11,7 @@ describe("checkLaunchEnv", () => {
     expect(result.errors).toEqual([]);
     expect(result.env.AUTH_ENABLED).toBe("false");
     expect(result.warnings).toContain(
-      "DATABASE_URL is not set; public pages will use seed fallback data.",
+      "DATABASE_URL is not set; public pages use local seed data only outside production.",
     );
   });
 
@@ -25,6 +25,7 @@ describe("checkLaunchEnv", () => {
       expect.arrayContaining([
         "DATABASE_URL is required when AUTH_ENABLED=true.",
         "AUTH_SECRET is required when AUTH_ENABLED=true.",
+        "NEXTAUTH_URL is required when AUTH_ENABLED=true.",
         "EMAIL_FROM and EMAIL_PROVIDER_API_KEY are required when AUTH_ENABLED=true.",
       ]),
     );
