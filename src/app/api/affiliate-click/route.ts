@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { buildAffiliateLink } from "@/lib/affiliate/AffiliateLinkBuilder";
+import {
+  AffiliateUrlNotAllowedError,
+  buildAffiliateLink,
+} from "@/lib/affiliate/AffiliateLinkBuilder";
 import { getListingDetail } from "@/lib/listings/getListingDetail";
+import { isServiceUnavailableError } from "@/lib/http/errors";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -10,22 +14,46 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing listing id" }, { status: 400 });
   }
 
-  const listing = await getListingDetail(listingId);
+  try {
+    const listing = await getListingDetail(listingId);
 
-  if (!listing?.affiliateUrl) {
-    return NextResponse.json({ error: "Listing has no affiliate link" }, { status: 404 });
+    if (!listing?.affiliateUrl) {
+      return NextResponse.json(
+        { error: "Listing has no affiliate link" },
+        { status: 404 },
+      );
+    }
+
+    let trackedUrl: string;
+    try {
+      trackedUrl = buildAffiliateLink({
+        baseUrl: listing.affiliateUrl,
+        provider:
+          process.env.AFFILIATE_DEFAULT_PROVIDER === "booking"
+            ? "booking"
+            : "generic",
+        partnerId: process.env.AFFILIATE_BOOKING_PARTNER_ID,
+        campaign: process.env.LAUNCH_CITY_SLUG ?? "launch_city",
+      });
+    } catch (error) {
+      if (error instanceof AffiliateUrlNotAllowedError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
+    }
+
+    await recordClickIfDatabaseExists(listing.id);
+
+    return NextResponse.redirect(trackedUrl);
+  } catch (error) {
+    if (isServiceUnavailableError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode },
+      );
+    }
+    throw error;
   }
-
-  await recordClickIfDatabaseExists(listing.id);
-
-  const trackedUrl = buildAffiliateLink({
-    baseUrl: listing.affiliateUrl,
-    provider: process.env.AFFILIATE_DEFAULT_PROVIDER === "booking" ? "booking" : "generic",
-    partnerId: process.env.AFFILIATE_BOOKING_PARTNER_ID,
-    campaign: process.env.LAUNCH_CITY_SLUG ?? "launch_city",
-  });
-
-  return NextResponse.redirect(trackedUrl);
 }
 
 async function recordClickIfDatabaseExists(listingId: string) {
