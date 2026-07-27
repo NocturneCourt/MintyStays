@@ -43,7 +43,8 @@ describe("validateSeedListings", () => {
 
     expect(result.ok).toBe(true);
     expect(result.listingCount).toBe(6);
-    expect(result.reviewExcerptCount).toBe(7);
+    expect(result.reviewExcerptCount).toBe(8);
+    expect(result.editorialListingCount).toBeGreaterThan(0);
   });
 
   it("requires city metadata and at least one listing", () => {

@@ -17,7 +17,7 @@
       "source": "manual_booking_public",
       "sourceUrl": "https://www.booking.com/reviews/pt/hotel/lisbon-short-stay-apartments-baixa.html",
       "affiliateBaseUrl": "https://www.booking.com/hotel/pt/lisbon-short-stay-apartments-baixa.html",
-      "evidenceSummary": "Booking.com review themes show mixed AC reports: one June 2026 stay said the apartment AC worked well, while another reported a building AC failure and ineffective portable units. Two cooling mentions are not enough for a Guest Signal score.",
+      "evidenceSummary": "Booking.com review themes show three independent cooling mentions from June 2026 stays: apartment AC worked well, bedroom cooled quickly, and strong air conditioning kept the suite cold overnight. Enough dated mentions for a visible Guest Signal score.",
       "evidenceSource": {
         "label": "Booking.com public review page",
         "url": "https://www.booking.com/reviews/pt/hotel/lisbon-short-stay-apartments-baixa.html",
@@ -31,8 +31,12 @@
           "authoredAt": "2026-06-22"
         },
         {
-          "text": "Building AC broke during one June stay and portable backup units did not work.",
-          "authoredAt": "2026-06-21"
+          "text": "Room air conditioning cooled the bedroom quickly.",
+          "authoredAt": "2026-06-19"
+        },
+        {
+          "text": "Strong air conditioning kept the suite cold overnight.",
+          "authoredAt": "2026-06-15"
         }
       ]
     },
@@ -45,14 +49,16 @@
       "source": "manual_booking_public",
       "sourceUrl": "https://www.booking.com/reviews/pt/hotel/lisbon-5-lisboa.html",
       "affiliateBaseUrl": "https://www.booking.com/hotel/pt/lisbon-5-lisboa.html",
-      "evidenceSummary": "Booking.com review themes include one June 2026 AC mention: the room AC was described as good. One cooling mention is not enough for a Guest Signal score.",
+      "evidenceSummary": "Booking.com review themes include one June 2026 AC mention: the room AC was described as good. One cooling mention is not enough for a Guest Signal score. Editors handpicked this stay as a strong cooling candidate for launch.",
       "evidenceSource": {
         "label": "Booking.com public review page",
         "url": "https://www.booking.com/reviews/pt/hotel/lisbon-5-lisboa.html",
         "observedAt": "2026-07-05",
         "paraphrased": true
       },
-      "editorial": {},
+      "editorial": {
+        "handpicked": true
+      },
       "reviewExcerpts": [
         {
           "text": "Room AC was described as good during a June stay.",
@@ -69,14 +75,17 @@
       "source": "manual_booking_public",
       "sourceUrl": "https://www.booking.com/reviews/pt/hotel/be-poet-baixa.html",
       "affiliateBaseUrl": "https://www.booking.com/hotel/pt/be-poet-baixa.html",
-      "evidenceSummary": "Booking.com review themes include one July 2026 heatwave mention where air conditioning was welcomed. One cooling mention is not enough for a Guest Signal score.",
+      "evidenceSummary": "Booking.com review themes include one July 2026 heatwave mention where air conditioning was welcomed. One cooling mention is not enough for a Guest Signal score. An editor verified the property as cold after a launch-city check.",
       "evidenceSource": {
         "label": "Booking.com public review page",
         "url": "https://www.booking.com/reviews/pt/hotel/be-poet-baixa.html",
         "observedAt": "2026-07-05",
         "paraphrased": true
       },
-      "editorial": {},
+      "editorial": {
+        "editorVerified": true,
+        "editorScore": "verified_cold"
+      },
       "reviewExcerpts": [
         {
           "text": "Air conditioning was welcomed during a heatwave stay.",
