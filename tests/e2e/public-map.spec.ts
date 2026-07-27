@@ -15,7 +15,7 @@ test("renders launch-city map, pins, and non-empty listing cards", async ({ page
   await expect(page.getByRole("heading", { name: "LSA Príncipe Real by Numa" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Charm Flats" })).toBeVisible();
 
-  await expect(page.getByText("mixed AC reports")).toBeVisible();
+  await expect(page.getByText("visible Guest Signal score")).toBeVisible();
   await expect(page.getByText("room AC was described as good")).toBeVisible();
   await expect(page.getByText("heatwave mention")).toBeVisible();
   await expect(page.getByText("unit had ample air conditioning")).toBeVisible();
