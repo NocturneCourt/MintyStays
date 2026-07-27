@@ -5,6 +5,10 @@ import {
   MAX_DISPUTES_PER_LISTING_IP_PER_DAY,
   submitAnonymousContribution,
 } from "@/lib/contributions/contributionService";
+import {
+  calculateGuestSignal,
+  type GuestSignalInput,
+} from "@/lib/scoring/guestSignalFormula";
 
 type StoredRow = Record<string, unknown>;
 
@@ -12,6 +16,7 @@ type TestState = {
   contributions: StoredRow[];
   reviewSignals: StoredRow[];
   listingUpdates: StoredRow[];
+  recomputeCalls: Array<{ listingId: string; now: Date }>;
 };
 
 type TestTransaction = {
@@ -25,19 +30,45 @@ type TestTransaction = {
   };
 };
 
+const now = new Date("2026-06-26T12:00:00Z");
+const baselineSignals: GuestSignalInput[] = [
+  {
+    source: "scraped",
+    sentiment: "positive",
+    rawExcerpt: "AC cooled the room quickly.",
+    authoredAt: now,
+  },
+  {
+    source: "scraped",
+    sentiment: "positive",
+    rawExcerpt: "Strong air conditioning during heatwave.",
+    authoredAt: now,
+  },
+];
+
 describe("anonymous contribution integration", () => {
   it("stores anonymous source audit rows and flags disputes for review without hiding", async () => {
     const { db, state } = createContributionTestDb();
 
-    const result = await submitAnonymousContribution(db, {
-      listingId: "11111111-1111-4111-8111-111111111111",
-      sessionId: "session-1",
-      vote: "dispute_weak",
-      comment: "Central AC never got below warm.",
-      clientIp: "203.0.113.10",
-    });
+    const result = await submitAnonymousContribution(
+      db,
+      {
+        listingId: "11111111-1111-4111-8111-111111111111",
+        sessionId: "session-1",
+        vote: "dispute_weak",
+        comment: "Central AC never got below warm.",
+        clientIp: "203.0.113.10",
+        now,
+      },
+      {
+        async recomputeListingSignals(_db, listingId, recomputeAt) {
+          state.recomputeCalls.push({ listingId, now: recomputeAt });
+          return calculateGuestSignal(baselineSignals, recomputeAt);
+        },
+      },
+    );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       status: "created",
       listingStatus: "active",
       reviewNeeded: true,
@@ -62,6 +93,45 @@ describe("anonymous contribution integration", () => {
     // Must not auto-hide from public query (status stays active; only review_needed).
     expect(state.listingUpdates).toMatchObject([{ reviewNeeded: true }]);
     expect(state.listingUpdates[0]).not.toHaveProperty("status", "disputed");
+    expect(state.recomputeCalls).toHaveLength(1);
+  });
+
+  it("recomputes Guest Signal after anonymous contribution (parity with Insider)", async () => {
+    const { db, state } = createContributionTestDb();
+    const listingId = "44444444-4444-4444-8444-444444444444";
+
+    const result = await submitAnonymousContribution(
+      db,
+      {
+        listingId,
+        sessionId: "session-guest-signal",
+        vote: "confirm_cold",
+        comment: "Bedroom stayed cold all night.",
+        now,
+      },
+      {
+        async recomputeListingSignals(_db, id, recomputeAt) {
+          state.recomputeCalls.push({ listingId: id, now: recomputeAt });
+          return calculateGuestSignal(
+            [
+              ...baselineSignals,
+              ...state.reviewSignals.map((signal) => ({
+                source: "anonymous" as const,
+                sentiment: signal.coolingSentiment as "positive" | "negative",
+                rawExcerpt: signal.rawExcerpt as string,
+                authoredAt: signal.authoredAt as Date,
+              })),
+            ],
+            recomputeAt,
+          );
+        },
+      },
+    );
+
+    expect(result.status).toBe("created");
+    expect(result.guestSignal?.status).toBe("scored");
+    expect(result.guestSignal?.coolingMentionCount).toBe(3);
+    expect(state.recomputeCalls).toEqual([{ listingId, now }]);
   });
 
   it("prevents duplicate anonymous votes for one listing session", async () => {
@@ -70,14 +140,25 @@ describe("anonymous contribution integration", () => {
       listingId: "22222222-2222-4222-8222-222222222222",
       sessionId: "session-2",
       vote: "confirm_cold" as const,
+      now,
+    };
+    const recompute = {
+      async recomputeListingSignals(
+        _db: DbClient,
+        listingId: string,
+        recomputeAt: Date,
+      ) {
+        state.recomputeCalls.push({ listingId, now: recomputeAt });
+        return calculateGuestSignal(baselineSignals, recomputeAt);
+      },
     };
 
-    await expect(submitAnonymousContribution(db, input)).resolves.toEqual({
+    await expect(submitAnonymousContribution(db, input, recompute)).resolves.toMatchObject({
       status: "created",
       listingStatus: "active",
       reviewNeeded: false,
     });
-    await expect(submitAnonymousContribution(db, input)).resolves.toEqual({
+    await expect(submitAnonymousContribution(db, input, recompute)).resolves.toEqual({
       status: "duplicate",
       listingStatus: "active",
       reviewNeeded: false,
@@ -86,6 +167,8 @@ describe("anonymous contribution integration", () => {
     expect(state.contributions).toHaveLength(1);
     expect(state.reviewSignals).toHaveLength(1);
     expect(state.listingUpdates).toHaveLength(0);
+    // Recompute only on successful create, not on duplicate.
+    expect(state.recomputeCalls).toHaveLength(1);
   });
 
   it("rate limits disputes to 3 per listing per IP per day", async () => {
@@ -118,6 +201,7 @@ describe("anonymous contribution integration", () => {
     expect(state.contributions).toHaveLength(MAX_DISPUTES_PER_LISTING_IP_PER_DAY);
     expect(state.reviewSignals).toHaveLength(0);
     expect(state.listingUpdates).toHaveLength(0);
+    expect(state.recomputeCalls).toHaveLength(0);
   });
 });
 
@@ -126,6 +210,7 @@ function createContributionTestDb(options?: { seedContributions?: StoredRow[] })
     contributions: [...(options?.seedContributions ?? [])],
     reviewSignals: [],
     listingUpdates: [],
+    recomputeCalls: [],
   };
 
   const transaction: TestTransaction = {

@@ -2,6 +2,7 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import type { DbClient } from "@/db/client";
 import { validateContributionInvariant } from "@/db/invariants";
 import { listings, reviewSignals, userContributions } from "@/db/schema";
+import { recomputeListingSignals } from "@/lib/scoring/recomputeListingSignals";
 
 export type ContributionVote = "confirm_cold" | "dispute_weak" | "broken";
 
@@ -21,11 +22,17 @@ export type ContributionResult = {
   /** Public visibility status after write. Disputes no longer auto-hide. */
   listingStatus: "active";
   reviewNeeded: boolean;
+  guestSignal?: Awaited<ReturnType<typeof recomputeListingSignals>>;
+};
+
+type AnonymousContributionOptions = {
+  recomputeListingSignals?: typeof recomputeListingSignals;
 };
 
 export async function submitAnonymousContribution(
   db: DbClient,
   input: AnonymousContributionInput,
+  options: AnonymousContributionOptions = {},
 ): Promise<ContributionResult> {
   validateContributionInvariant({
     contributorType: "anonymous",
@@ -71,7 +78,7 @@ export async function submitAnonymousContribution(
     }
   }
 
-  return db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     await tx.insert(userContributions).values({
       listingId: input.listingId,
       contributorType: "anonymous",
@@ -101,13 +108,16 @@ export async function submitAnonymousContribution(
         })
         .where(eq(listings.id, input.listingId));
     }
-
-    return {
-      status: "created" as const,
-      listingStatus: "active" as const,
-      reviewNeeded,
-    };
   });
+
+  const recompute = options.recomputeListingSignals ?? recomputeListingSignals;
+
+  return {
+    status: "created",
+    listingStatus: "active",
+    reviewNeeded,
+    guestSignal: await recompute(db, input.listingId, now),
+  };
 }
 
 export async function isDisputeRateLimited(
