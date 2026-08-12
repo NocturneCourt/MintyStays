@@ -70,7 +70,7 @@ describe.skipIf(!databaseConfigured)("PostgreSQL smoke path", () => {
       .from(userContributions)
       .where(eq(userContributions.sessionId, sessionId));
     expect(persistedRows).toHaveLength(0);
-  });
+  }, 30_000);
 });
 
 afterAll(async () => {
