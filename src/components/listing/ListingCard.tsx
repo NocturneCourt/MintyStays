@@ -1,27 +1,31 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
 import { ArrowRight, Building2, Home, MapPin, Snowflake } from "lucide-react";
 import Link from "next/link";
 import { coldIndex } from "@/lib/design/coldIndex";
 import type { PublicListing } from "@/lib/listings/types";
 import { ScoreRows } from "./ScoreRows";
+import { SignalsConflictNotice } from "./SignalsConflictNotice";
 import { TrustBadge } from "./TrustBadge";
 
 export function ListingCard({
   listing,
   selected,
   onSelect,
+  cardRef,
 }: {
   listing: PublicListing;
   selected: boolean;
   onSelect: () => void;
+  cardRef?: Ref<HTMLElement>;
 }) {
   const cardStyle = getCardStyle(listing);
 
   return (
     <article
-      className={`listing-card ${selected ? "is-selected" : ""}`}
+      ref={cardRef}
+      className={`listing-card ${selected ? "is-selected" : ""} ${listing.signalsConflict ? "has-signals-conflict" : ""} ${listing.guestSignalScore == null ? "is-unverified" : ""}`}
       style={cardStyle}
     >
       <button
@@ -36,7 +40,10 @@ export function ListingCard({
               ? `${listing.guestSignalScore} Guest Signal`
               : "Unverified"}
           </span>
-          <TrustBadge tier={listing.trustTier} />
+          {listing.trustTier !== "unverified" ? (
+            <TrustBadge tier={listing.trustTier} />
+          ) : null}
+          <SignalsConflictNotice listing={listing} variant="compact" />
         </div>
         <div className="listing-card-top">
           <span className="listing-type-pill">

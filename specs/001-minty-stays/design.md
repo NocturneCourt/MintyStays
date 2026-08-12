@@ -308,3 +308,51 @@ When `signalsConflict` is true (plan.md Guest/Editor Conflict Rule):
 - Real property photography licensing pipeline (launch uses licensed-or-placeholder).
 - Animated thermal map heat layer (post-MVP).
 - Server-side clustering (tied to the multi-city / >2k-listings trigger in plan.md).
+
+## 9. Course correction v1.1 (the first pass over-built)
+
+The first implementation added chrome instead of removing it: a "selected
+dossier" card, a "cooling layer / Cold Index" tool stack, a bottom "insight
+strip", two topbar signal cards, and a scale legend all compete on one screen,
+and several honesty and theming rules regressed. The correction is **reductive**:
+one representation per fact, honest color, and the two things that actually
+matter (dark map, real thermal pins, photography). Verified blunders and their
+fixes:
+
+1. **Redundancy — the same fact in 4 places.** "Lisbon", "Editor verified", and
+   the Guest/Editor summary each appear in the topbar, the map console, the
+   insight strip, the "Ranked stays" heading, and the list stats. FIX: one map
+   console (city + selected name), one list heading, one stats row. Delete the
+   topbar signal cards and the bottom insight strip. Delete the "cooling layer"
+   tool stack (the legend already names the Cold Index).
+2. **Selected "dossier" is a third copy of the list card.** FIX: remove it. On
+   select, highlight and scroll the matching list card; the map console names the
+   selection. One canonical card.
+3. **Dishonest color on unverified stays.** Unverified listings render a green
+   placeholder, a green card tint, and the word "Cold". Green reads as
+   "adequate/cool" for something with no score. FIX: unverified uses a neutral
+   frost tone everywhere, the chip reads "Unverified", the placeholder is
+   thermal-neutral, and no band color or "Cold" wording appears until a score
+   exists. Color only ever encodes a real score (SC-011).
+4. **Light map inside the dark shell.** The map is still light positron in Night
+   Frost — a hard seam. FIX: build the dark MapLibre style (T085) and switch by
+   theme.
+5. **Pins carry no signal.** Pins are identical gray circles with no score and no
+   band color; scored and unrated look the same. FIX: band-colored pins with the
+   score numeral, hollow frosted markers for unrated, per §6.4 / FR-033.
+6. **No photography.** The placeholder is a flat hatch, not the branded thermal
+   placeholder; no real images. FIX: T080/T081.
+7. **Map chrome overlaps content.** The console covers pins; the insight strip
+   collides with the zoom/compass controls and clips. FIX: after deleting the
+   extra chrome, keep the console top-left with a safe margin and nothing
+   bottom-anchored over the controls.
+8. **Mobile is unbuilt.** No bottom sheet; oversized topbar signal cards eat the
+   first screen; the insight strip clips behind the compass. FIX: T088 bottom
+   sheet; the deletions above remove the rest.
+9. **Empty-looking board (product, not cosmetic).** Every stay is Unverified
+   because of data starvation (see `data-sources.md`). FIX is upstream: seed the
+   launch board with Editor Verified / Handpicked cold stays so it reads curated,
+   not empty, while Guest Signal matures.
+
+The bar for v1.1: one screen, no fact shown twice, color only ever means a real
+score, and the map looks like it belongs in the theme.

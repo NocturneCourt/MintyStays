@@ -16,6 +16,7 @@ type StoredListing = {
   trustTier: TrustTier;
   guestSignalScore: number | null;
   guestSignalStatus: GuestSignalStatus;
+  reviewNeeded: boolean;
 };
 
 type StoredUpdate = Partial<StoredListing> & {
@@ -35,6 +36,7 @@ describe("editorial service", () => {
       trustTier: "scored",
       guestSignalScore: 82,
       guestSignalStatus: "scored",
+      reviewNeeded: false,
     });
 
     const result = await updateEditorialListing(db, {
@@ -75,6 +77,7 @@ describe("editorial service", () => {
       trustTier: "unverified",
       guestSignalScore: null,
       guestSignalStatus: "unverified",
+      reviewNeeded: false,
     });
 
     const result = await updateEditorialListing(db, {
@@ -95,6 +98,36 @@ describe("editorial service", () => {
     expect(state.listing?.editorVerifiedAt).toBeNull();
   });
 
+  it("lets an editor resolve a review flag without changing Guest Signal", async () => {
+    const { db, state } = createEditorialTestDb({
+      id: listingId,
+      isHandpicked: false,
+      editorScore: null,
+      editorVerifiedAt: null,
+      trustTier: "scored",
+      guestSignalScore: 74,
+      guestSignalStatus: "scored",
+      reviewNeeded: true,
+    });
+
+    const result = await updateEditorialListing(db, {
+      listingId,
+      reviewNeeded: false,
+      now,
+    });
+
+    expect(result).toMatchObject({
+      reviewNeeded: false,
+      guestSignalScore: 74,
+      guestSignalStatus: "scored",
+    });
+    expect(state.listing).toMatchObject({
+      reviewNeeded: false,
+      guestSignalScore: 74,
+      guestSignalStatus: "scored",
+    });
+  });
+
   it("requires Editor Score when Editor Verified is set", async () => {
     const { db } = createEditorialTestDb({
       id: listingId,
@@ -104,6 +137,7 @@ describe("editorial service", () => {
       trustTier: "handpicked",
       guestSignalScore: 70,
       guestSignalStatus: "scored",
+      reviewNeeded: false,
     });
 
     await expect(

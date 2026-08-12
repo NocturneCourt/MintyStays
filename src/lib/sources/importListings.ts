@@ -6,10 +6,12 @@ import {
   reviewSignals,
   type NewListing,
 } from "@/db/schema";
+import type { DbClient } from "@/db/client";
 import { hashReviewContent } from "@/lib/extraction/contentHash";
 import { getCoolingExtractionVersion } from "@/lib/extraction/version";
 import { calculateGuestSignal } from "@/lib/scoring/guestSignalFormula";
 import { inferCoolingSentiment } from "@/lib/scoring/inferCoolingSentiment";
+import { recomputeListingSignals as recomputeStoredListingSignals } from "@/lib/scoring/recomputeListingSignals";
 import { deriveTrustTier } from "@/lib/scoring/trustTier";
 import type { ListingSourceAdapter, SeedListing } from "./ListingSourceAdapter";
 
@@ -43,14 +45,25 @@ type ImportTransaction = {
   };
 };
 
+type ImportOptions = {
+  db?: ImportDb;
+  recomputeListingSignals?: (
+    db: DbClient,
+    listingId: string,
+  ) => Promise<unknown>;
+};
+
 export async function importListingsFromSource(
   adapter: ListingSourceAdapter,
   input: { citySlug: string; path?: string },
-  // Accept any drizzle-compatible client; narrowed at call sites / mocks.
-  options: { db?: { transaction: ImportDb["transaction"] } | ImportDb } = {},
+  options: ImportOptions = {},
 ) {
   const seedListings = await adapter.importCity(input);
-  const database = (options.db ?? (await loadDefaultDb())) as ImportDb;
+  const database = options.db ?? (await loadDefaultDb());
+  const recompute =
+    options.recomputeListingSignals ??
+    ((db, listingId) =>
+      recomputeStoredListingSignals(db as unknown as DbClient, listingId));
 
   return database.transaction(async (tx) => {
     const city = seedListings[0]?.city;
@@ -162,6 +175,8 @@ export async function importListingsFromSource(
           .returning();
       }
 
+      await recompute(tx as unknown as DbClient, upsertedListing.id);
+
       imported.push(upsertedListing);
     }
 
@@ -169,7 +184,10 @@ export async function importListingsFromSource(
   });
 }
 
-/** Fields refreshed on re-seed; leaves status/reviewNeeded for editorial ops. */
+/**
+ * Fields refreshed on re-seed. Guest Signal, editorial state, and moderation
+ * state are database-owned and are recomputed or edited separately.
+ */
 export function listingUpsertSet(newListing: NewListing) {
   return {
     name: newListing.name,
@@ -179,15 +197,7 @@ export function listingUpsertSet(newListing: NewListing) {
     address: newListing.address,
     affiliateUrl: newListing.affiliateUrl,
     acType: newListing.acType,
-    guestSignalScore: newListing.guestSignalScore,
-    guestSignalStatus: newListing.guestSignalStatus,
-    guestSignalConfidence: newListing.guestSignalConfidence,
-    editorScore: newListing.editorScore,
-    isHandpicked: newListing.isHandpicked,
-    editorVerifiedAt: newListing.editorVerifiedAt,
-    trustTier: newListing.trustTier,
     evidenceSummary: newListing.evidenceSummary,
-    reviewCountAnalyzed: newListing.reviewCountAnalyzed,
     lastSeededAt: newListing.lastSeededAt,
     updatedAt: new Date(),
   };

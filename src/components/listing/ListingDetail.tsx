@@ -11,6 +11,7 @@ import type { PublicListing } from "@/lib/listings/types";
 import { AnonymousContributionForm } from "./AnonymousContributionForm";
 import { InsiderReportForm } from "./InsiderReportForm";
 import { ScoreRows } from "./ScoreRows";
+import { SignalsConflictNotice } from "./SignalsConflictNotice";
 import { TrustBadge } from "./TrustBadge";
 
 type ListingDetailAuthState =
@@ -55,15 +56,14 @@ export function ListingDetail({
                 </>
               ) : null}
             </p>
-            <p className="detail-summary">
-              {formatDetailSummary(listing)}
-            </p>
+            <p className="detail-summary">{formatDetailSummary(listing)}</p>
           </div>
           <section className="detail-score-card" aria-label="Cooling scores">
             <ScoreRows listing={listing} layout="panel" />
+            <SignalsConflictNotice listing={listing} variant="panel" />
             <p className="score-note">
-              Guest Signal uses cooling mentions and reports. Editor Score is a
-              separate human check. <Link href="/guest-signal">Formula</Link>.
+              Guest Signal uses cooling mentions and reports. Editor Score is a separate
+              human check. <Link href="/guest-signal">Formula</Link>.
             </p>
           </section>
         </div>
@@ -77,7 +77,9 @@ export function ListingDetail({
           <div>
             <MapPin size={18} aria-hidden="true" />
             <span>Evidence</span>
-            <strong>{formatCoolingMentionCount(listing.reviewCountAnalyzed)} read</strong>
+            <strong>
+              {formatCoolingMentionCount(listing.reviewCountAnalyzed)} read
+            </strong>
           </div>
           <div>
             <ExternalLink size={18} aria-hidden="true" />
@@ -99,7 +101,10 @@ export function ListingDetail({
               Confirm the exact room&apos;s AC setup before checkout.
             </p>
             {listing.affiliateUrl ? (
-              <a className="booking-link" href={`/api/affiliate-click?id=${listing.id}`}>
+              <a
+                className="booking-link"
+                href={`/api/affiliate-click?id=${listing.id}`}
+              >
                 Open Booking.com
                 <ExternalLink size={16} aria-hidden="true" />
               </a>
@@ -120,10 +125,7 @@ export function ListingDetail({
               </Link>
             )}
             {authState.canAccessEditor ? (
-              <Link
-                className="secondary-link"
-                href={`/admin/listings/${listing.id}`}
-              >
+              <Link className="secondary-link" href={`/admin/listings/${listing.id}`}>
                 Edit editorial fields
               </Link>
             ) : null}

@@ -30,6 +30,7 @@ export type PublicListing = {
   guestSignalStatus: "unverified" | "scored";
   guestSignalConfidence: GuestSignalConfidence | null;
   editorScore: EditorScore | null;
+  signalsConflict: boolean;
   trustTier: TrustTier;
   evidenceSummary: string;
   reviewCountAnalyzed: number;

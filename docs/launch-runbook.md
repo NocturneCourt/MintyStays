@@ -13,9 +13,13 @@ This runbook covers the day-one public deploy for `mintystays.com` with
 - `AFFILIATE_DEFAULT_PROVIDER`: `generic` or `booking`.
 - `AFFILIATE_BOOKING_PARTNER_ID`: partner ID when Booking.com links are used.
 - `NEXT_PUBLIC_SITE_URL=https://mintystays.com`: canonical public URL.
+- `NEXTAUTH_URL=https://mintystays.com`: canonical Auth.js callback origin.
 - `AUTH_SECRET`: set before enabling auth, even while auth is hidden.
 - `EMAIL_FROM` and `EMAIL_PROVIDER_API_KEY`: required before auth flag flip.
 - `ANTHROPIC_API_KEY`: required for extraction jobs.
+- `TRUSTED_PROXY_HEADERS=false`: keep disabled unless an additional proxy is
+  verified to sanitize `X-Forwarded-For`; Railway's documented `X-Real-IP`
+  header is used by default.
 
 ## First Deploy
 
@@ -51,9 +55,14 @@ docker run --name mintystays-postgres \
 export DATABASE_URL="postgres://postgres:mintystays@127.0.0.1:54329/mintystays"
 pnpm db:migrate
 pnpm db:seed
+pnpm test:postgres
 pnpm test:e2e
 docker rm -f mintystays-postgres
 ```
+
+`pnpm test:postgres` is a disposable-database smoke test. It verifies a real
+PostgreSQL read, contribution transaction, and rollback, and must not be run
+against production.
 
 ## Public Auth-Off Checks
 
@@ -66,6 +75,9 @@ With `AUTH_ENABLED=false`:
 - No public navigation should expose login, Insider, or Editor controls.
 - Seeded Handpicked and Editor Verified badges may appear publicly because
   ManualImportAdapter supports editorial fields while auth is off.
+- Anonymous disputes set a review flag. The authenticated editor queue is at
+  `/admin/reviews`; until auth is enabled, operators can run
+  `DATABASE_URL="$DATABASE_URL" pnpm db:review-queue` to monitor the flag.
 
 ## Rollback
 
@@ -73,5 +85,7 @@ If deploy smoke checks fail:
 
 1. Roll back to the previous Railway deployment.
 2. Leave `AUTH_ENABLED=false`.
-3. Do not rerun seed against production until the broken deploy is diagnosed.
+3. Do not rerun seed against production as a rollback step. If a reseed is
+   needed, verify the database backup and the live editorial/moderation state
+   first.
 4. Confirm affiliate redirects still resolve before re-opening traffic.

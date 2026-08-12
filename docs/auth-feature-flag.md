@@ -9,8 +9,7 @@ With `AUTH_ENABLED=false`:
 
 - Public map, filters, detail pages, affiliate redirects, and anonymous disputes
   stay available.
-- `/api/auth/*`, `/api/insider/reports`, and `/api/editor/listings/:id` return
-  404.
+- `/api/auth/*`, `/api/insider/reports`, and `/api/editor/listings/:id` return 404.
 - Public pages do not render sign-in, Insider report, or Editor edit controls.
 - Seeded editorial fields still render publicly.
 
@@ -21,6 +20,7 @@ Before flipping to `AUTH_ENABLED=true`, verify these variables are set:
 - `DATABASE_URL`
 - `AUTH_SECRET`
 - `NEXT_PUBLIC_SITE_URL`
+- `NEXTAUTH_URL` (the same canonical origin, used for auth callbacks)
 - `EMAIL_FROM`
 - `EMAIL_PROVIDER_API_KEY`
 
@@ -39,6 +39,8 @@ Expected behavior:
 - Signed-in Insider Members can submit attributable reports.
 - Signed-in Editors can open `/admin/listings/:id` and update Handpicked,
   Editor Verified, and Editor Score without changing Guest Signal.
+- Signed-in Editors can open `/admin/reviews` to inspect and resolve listings
+  flagged by anonymous or Insider disputes.
 
 ## Rollback
 

@@ -27,6 +27,7 @@ export type EditorialUpdateInput = {
   isHandpicked?: boolean;
   editorVerified?: boolean;
   editorScore?: EditorScore | null;
+  reviewNeeded?: boolean;
   now?: Date;
 };
 
@@ -38,6 +39,7 @@ export type EditorialUpdateResult = {
   trustTier: TrustTier;
   guestSignalScore: number | null;
   guestSignalStatus: GuestSignalStatus;
+  reviewNeeded: boolean;
 };
 
 export async function updateEditorialListing(
@@ -52,6 +54,7 @@ export async function updateEditorialListing(
       editorVerifiedAt: listings.editorVerifiedAt,
       guestSignalScore: listings.guestSignalScore,
       guestSignalStatus: listings.guestSignalStatus,
+      reviewNeeded: listings.reviewNeeded,
     })
     .from(listings)
     .where(eq(listings.id, input.listingId))
@@ -74,6 +77,7 @@ export async function updateEditorialListing(
       : "editorScore" in input
         ? input.editorScore ?? null
         : current.editorScore;
+  const nextReviewNeeded = input.reviewNeeded ?? current.reviewNeeded;
 
   if (nextEditorVerifiedAt && !nextEditorScore) {
     throw new EditorialInvariantError(
@@ -101,6 +105,7 @@ export async function updateEditorialListing(
       editorScore: nextEditorScore,
       editorVerifiedAt: nextEditorVerifiedAt,
       trustTier,
+      reviewNeeded: nextReviewNeeded,
       updatedAt: now,
     })
     .where(eq(listings.id, input.listingId));
@@ -113,6 +118,7 @@ export async function updateEditorialListing(
     trustTier,
     guestSignalScore: current.guestSignalScore,
     guestSignalStatus: current.guestSignalStatus,
+    reviewNeeded: nextReviewNeeded,
   };
 }
 

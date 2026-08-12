@@ -1,6 +1,7 @@
 import rawSeed from "@/db/seed/minty-launch-city.json";
 import { calculateGuestSignal } from "@/lib/scoring/guestSignalFormula";
 import { inferCoolingSentiment } from "@/lib/scoring/inferCoolingSentiment";
+import { hasSignalsConflict } from "@/lib/scoring/signalsConflict";
 import { deriveTrustTier } from "@/lib/scoring/trustTier";
 import { seedFileSchema } from "@/lib/sources/ListingSourceAdapter";
 import type { PublicCity, PublicListing } from "./types";
@@ -59,6 +60,10 @@ export function getSeedListings(): PublicListing[] {
       guestSignalStatus: guestSignal.status,
       guestSignalConfidence: guestSignal.confidence,
       editorScore: listing.editorial?.editorScore ?? null,
+      signalsConflict: hasSignalsConflict({
+        guestSignalScore: guestSignal.score,
+        editorScore: listing.editorial?.editorScore ?? null,
+      }),
       trustTier,
       evidenceSummary:
         listing.evidenceSummary ??

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BadgeCheck, Gauge, Snowflake } from "lucide-react";
+import { Snowflake } from "lucide-react";
 import { getActiveCity } from "@/lib/cities/getActiveCity";
 import { isAuthEnabled } from "@/lib/auth/featureFlag";
 import { getPublicListings } from "@/lib/listings/getPublicListings";
@@ -18,17 +18,6 @@ export default async function PublicPage({ searchParams }: PublicPageProps) {
   const listings = await getPublicListings(filters);
   const styleUrl =
     process.env.MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/positron";
-  const scoredListings = listings.filter(
-    (listing) => listing.guestSignalStatus === "scored",
-  );
-  const editorVerifiedCount = listings.filter(
-    (listing) => listing.trustTier === "editor_verified",
-  ).length;
-  const topGuestSignal = scoredListings.length
-    ? Math.max(
-        ...scoredListings.map((listing) => listing.guestSignalScore ?? 0),
-      )
-    : null;
 
   return (
     <main className="app-shell">
@@ -43,22 +32,6 @@ export default async function PublicPage({ searchParams }: PublicPageProps) {
           </span>
         </div>
         <div className="topbar-actions">
-          <span className="topbar-signal">
-            <Gauge size={16} aria-hidden="true" />
-            <span>
-              <small>Guest Signal</small>
-              <strong>
-                {topGuestSignal != null ? `${topGuestSignal}` : "Pending"}
-              </strong>
-            </span>
-          </span>
-          <span className="topbar-signal">
-            <BadgeCheck size={16} aria-hidden="true" />
-            <span>
-              <small>Editor Score</small>
-              <strong>{editorVerifiedCount} verified</strong>
-            </span>
-          </span>
           <ThemeToggle />
           <Link className="topbar-link" href="/guest-signal">
             Formula

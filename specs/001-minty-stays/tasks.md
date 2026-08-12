@@ -280,6 +280,44 @@ themes with the trust model intact.
 
 ---
 
+## Phase 14: UX Course Correction v1.1
+
+**Purpose**: Undo the over-built first pass (design.md §9). Reductive: one
+representation per fact, honest color, and the high-impact visuals.
+
+**Prerequisites**: `design.md` §9.
+
+- [ ] T091 Remove redundant chrome: delete the topbar signal cards, the bottom "insight strip", the "cooling layer" tool stack, and the "selected dossier" card; keep one map console, one list heading, one stats row, in `src/app/(public)/page.tsx` and `src/components/map/MapExplorer.tsx`
+- [ ] T092 On pin/card select, highlight and scroll the matching list card instead of rendering a duplicate dossier, in `src/components/map/MapExplorer.tsx` and `src/components/listing/ListingList.tsx`
+- [ ] T093 Honest color: unverified stays never render a band color, green tint, or "Cold" wording; use a neutral frost tone and an "Unverified" chip everywhere, in `src/components/listing/ListingCard.tsx`, `src/components/listing/ScoreRows.tsx`, and `src/app/globals.css`
+- [ ] T094 Fix map chrome placement so the console and legend never overlap pins or the zoom/compass controls, in `src/components/map/MapExplorer.tsx` and `src/app/globals.css`
+- [ ] T095 [P] Seed the launch board with Editor Verified / Handpicked cold stays plus photos so it reads curated, not an all-Unverified wall, in `src/db/seed/minty-launch-city.json`
+
+**Checkpoint**: One screen, no fact shown twice, color only ever means a real
+score, and the map belongs in the active theme. (T085 dark map, T080/T081
+photography, and T088 mobile bottom sheet from Phase 13 also close these gaps.)
+
+---
+
+## Phase 15: Data Ingestion (lawful-first)
+
+**Purpose**: Feed the scoring pipeline from lawful sources so Guest Signal can
+mature. See `data-sources.md`. Gated on the §6 risk-posture decision.
+
+**Prerequisites**: `data-sources.md`, `raw_reviews` / `cooling_extractions`
+schema (T006b), the risk-posture decision.
+
+- [ ] T096 Implement `GooglePlacesAdapter` behind `ListingSourceAdapter`: fetch up to 5 reviews per property, map `publishTime` to `authored_at`, cache by `content_hash`, honor Google attribution/caching terms, in `src/lib/sources/GooglePlacesAdapter.ts`
+- [ ] T097 [P] Add a scheduled ingestion job that runs adapters, de-dupes across sources on `content_hash`, and triggers extraction + rescore, in `src/lib/sources/runIngestion.ts`
+- [ ] T098 Apply for Booking.com Demand API reviews access and stub `BookingDemandAdapter` behind the boundary (no scraping of Booking or Airbnb), in `src/lib/sources/BookingDemandAdapter.ts`
+- [ ] T099 [P] Add an ingestion attribution surface ("Reviews via Google") where source terms require it, in the listing detail evidence panel
+- [ ] T100 Implement `VendorReviewAdapter` (posture B) for Google reviews at scale behind `ListingSourceAdapter`, gated by `VENDOR_INGEST_ENABLED=false` and legal sign-off; never targets Booking or Airbnb; stores paraphrase/classification + short cited excerpt only, in `src/lib/sources/VendorReviewAdapter.ts`
+
+**Checkpoint**: A lawful adapter populates dated, de-duped `raw_reviews` and Guest
+Signal begins to appear without any scraping dependency.
+
+---
+
 ## Dependencies & Execution Order
 
 - **Setup**: T001-T005 have no dependencies.

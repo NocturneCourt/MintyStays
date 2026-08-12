@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:postgres": "vitest run tests/integration/postgres-smoke.test.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "prelaunch:check": "pnpm seed:validate -- --strict && pnpm typecheck && pnpm lint && pnpm test && pnpm build && PORT=3100 CI=1 pnpm test:e2e",
@@ -18,7 +19,8 @@
     "seed:validate": "tsx src/db/seed/validateSeed.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/db/seed/runManualImport.ts"
+    "db:seed": "tsx src/db/seed/runManualImport.ts",
+    "db:review-queue": "tsx src/scripts/listReviewQueue.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
@@ -30,7 +32,7 @@
     "nanoid": "^5.1.16",
     "next": "^16.2.9",
     "next-auth": "^4.24.14",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^9.0.3",
     "postgres": "^3.4.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

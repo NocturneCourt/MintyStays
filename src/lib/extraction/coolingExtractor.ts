@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
+  ClaudeJsonParseError,
   parseClaudeCoolingJson,
   type CoolingExtraction,
 } from "./parseClaudeJson";
@@ -33,6 +34,7 @@ type AnthropicMessageLike = {
 };
 
 export type CoolingExtractor = {
+  readonly model?: string;
   extract(reviewText: string): Promise<CoolingExtraction>;
 };
 
@@ -42,6 +44,9 @@ export type CoolingExtractorOptions = {
 };
 
 const DEFAULT_MODEL = "claude-sonnet-4-6";
+
+const COOLING_VOCABULARY =
+  /\b(a\/?c|air[- ]?con(?:ditioning)?|cooling|cold|hot|stuffy|stifling|fan|sweat|temperature)\b/i;
 
 const SYSTEM_PROMPT = [
   "You classify hotel and short-term rental review text only for air-conditioning cooling performance.",
@@ -63,23 +68,41 @@ export function createCoolingExtractor(
   const model = options.model ?? process.env.CLAUDE_MODEL ?? DEFAULT_MODEL;
 
   return {
+    model,
     async extract(reviewText) {
-      const message = await client.messages.create({
+      const rawOutput = await requestCoolingExtraction(
+        client,
         model,
-        max_tokens: 220,
-        temperature: 0,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: buildCoolingExtractionPrompt(reviewText),
-          },
-        ],
-      });
+        buildCoolingExtractionPrompt(reviewText),
+      );
 
-      return parseClaudeCoolingJson(readTextMessage(message));
+      try {
+        return parseClaudeCoolingJson(rawOutput);
+      } catch (error) {
+        if (!(error instanceof ClaudeJsonParseError)) {
+          throw error;
+        }
+
+        const repairedOutput = await requestCoolingExtraction(
+          client,
+          model,
+          [
+            "Repair the following classifier output.",
+            "Return ONLY one JSON object with the required exact keys.",
+            "Do not add Markdown or explanation.",
+            "",
+            rawOutput,
+          ].join("\n"),
+        );
+
+        return parseClaudeCoolingJson(repairedOutput);
+      }
     },
   };
+}
+
+export function mentionsCoolingVocabulary(reviewText: string) {
+  return COOLING_VOCABULARY.test(reviewText);
 }
 
 export function buildCoolingExtractionPrompt(reviewText: string) {
@@ -108,4 +131,25 @@ function readTextMessage(message: AnthropicMessageLike) {
   }
 
   return text;
+}
+
+async function requestCoolingExtraction(
+  client: AnthropicCoolingClient,
+  model: string,
+  prompt: string,
+) {
+  const message = await client.messages.create({
+    model,
+    max_tokens: 220,
+    temperature: 0,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  return readTextMessage(message);
 }

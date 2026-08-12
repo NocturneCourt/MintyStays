@@ -163,13 +163,21 @@ export function contributionToExcerpt(input: AnonymousContributionInput) {
   return input.comment?.trim() ? `${label} ${input.comment.trim()}` : label;
 }
 
-export function getClientIpFromHeaders(headers: Headers): string | null {
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
+export function getClientIpFromHeaders(
+  headers: Headers,
+  options: { trustForwardedFor?: boolean } = {},
+): string | null {
   const realIp = headers.get("x-real-ip")?.trim();
-  return realIp || null;
+  if (realIp) return realIp;
+
+  const trustForwardedFor =
+    options.trustForwardedFor ?? process.env.TRUSTED_PROXY_HEADERS === "true";
+
+  if (!trustForwardedFor) return null;
+
+  const forwarded = headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+
+  const first = forwarded.split(",")[0]?.trim();
+  return first || null;
 }

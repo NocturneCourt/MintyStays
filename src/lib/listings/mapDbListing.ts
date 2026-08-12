@@ -1,4 +1,5 @@
 import type { Listing } from "@/db/schema";
+import { hasSignalsConflict } from "@/lib/scoring/signalsConflict";
 import type { PublicListing } from "./types";
 
 export function mapDbListingToPublicListing(listing: Listing): PublicListing {
@@ -18,6 +19,10 @@ export function mapDbListingToPublicListing(listing: Listing): PublicListing {
     guestSignalStatus: listing.guestSignalStatus,
     guestSignalConfidence: listing.guestSignalConfidence,
     editorScore: listing.editorScore,
+    signalsConflict: hasSignalsConflict({
+      guestSignalScore: listing.guestSignalScore,
+      editorScore: listing.editorScore,
+    }),
     trustTier: listing.trustTier,
     evidenceSummary:
       listing.evidenceSummary ??

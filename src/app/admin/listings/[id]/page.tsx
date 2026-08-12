@@ -37,6 +37,7 @@ export default async function AdminListingPage({ params }: AdminListingPageProps
       trustTier: listings.trustTier,
       guestSignalScore: listings.guestSignalScore,
       guestSignalStatus: listings.guestSignalStatus,
+      reviewNeeded: listings.reviewNeeded,
     })
     .from(listings)
     .where(eq(listings.id, id))

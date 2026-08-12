@@ -47,8 +47,8 @@ affiliate click tracking, and stubs for future source adapters
 
 ## Constitution Check
 
-*GATE: Must pass before implementation. Re-check after each scoring, trust, auth,
-import, and listing-display change.*
+_GATE: Must pass before implementation. Re-check after each scoring, trust, auth,
+import, and listing-display change._
 
 - **Separate Guest Signal and Editor Score**: PASS. The schema, services, UI, and
   tasks keep machine and editorial signals independent.
@@ -180,7 +180,11 @@ type SeedListing = {
   editorial?: {
     handpicked?: boolean;
     editorVerified?: boolean;
-    editorScore?: "verified_cold" | "verified_adequate" | "verified_weak" | "verified_broken";
+    editorScore?:
+      | "verified_cold"
+      | "verified_adequate"
+      | "verified_weak"
+      | "verified_broken";
   };
   reviewExcerpts?: Array<{ text: string; authoredAt?: string }>;
 };
@@ -404,7 +408,7 @@ omitted these and a follow-up migration must add them):
 - `CHECK ((guest_signal_status = 'scored') = (guest_signal_score IS NOT NULL))`.
 - `CHECK (editor_score IS NULL OR editor_verified_at IS NOT NULL)`.
 - `CHECK ((contributor_type='anonymous' AND session_id IS NOT NULL AND user_id IS NULL)
-  OR (contributor_type='insider' AND user_id IS NOT NULL))`.
+OR (contributor_type='insider' AND user_id IS NOT NULL))`.
 - Public listing query requires evidence summary, review signal, Handpicked, or
   Editor Verified status (enforced in the query and an architecture test, not a
   row-level constraint).
@@ -489,6 +493,7 @@ MapLibre).
 
 - `DATABASE_URL`
 - `NEXT_PUBLIC_SITE_URL`
+- `NEXTAUTH_URL`
 - `LAUNCH_CITY_SLUG`
 - `AUTH_ENABLED=false`
 - `AUTH_SECRET`
@@ -514,5 +519,5 @@ MapLibre).
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| None | N/A | N/A |
+| --------- | ---------- | ------------------------------------ |
+| None      | N/A        | N/A                                  |

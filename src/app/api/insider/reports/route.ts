@@ -7,6 +7,7 @@ import { buildAuthOptions } from "@/lib/auth/authOptions";
 import { isAuthEnabled } from "@/lib/auth/featureFlag";
 import { toAuthPrincipal } from "@/lib/auth/roles";
 import { submitInsiderReport } from "@/lib/contributions/insiderReportService";
+import { isServiceUnavailableError } from "@/lib/http/errors";
 
 const insiderReportSchema = z.object({
   listingId: z.string().min(1),
@@ -38,31 +39,43 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { db } = await import("@/db/client");
-  const [listing] = await db
-    .select({ id: listings.id })
-    .from(listings)
-    .where(eq(listings.id, parsed.data.listingId))
-    .limit(1);
+  try {
+    const { db } = await import("@/db/client");
+    const [listing] = await db
+      .select({ id: listings.id })
+      .from(listings)
+      .where(eq(listings.id, parsed.data.listingId))
+      .limit(1);
 
-  if (!listing) {
-    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    if (!listing) {
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    }
+
+    const result = await submitInsiderReport(db, {
+      listingId: parsed.data.listingId,
+      userId: principal.userId,
+      vote: parsed.data.vote,
+      comment: parsed.data.comment,
+    });
+
+    return NextResponse.json(
+      {
+        status: result.status,
+        listingStatus: result.listingStatus,
+        reviewNeeded: result.reviewNeeded,
+        guestSignal: result.guestSignal,
+      },
+      { status: result.status === "duplicate" ? 409 : 201 },
+    );
+  } catch (error) {
+    if (isServiceUnavailableError(error) || process.env.DATABASE_URL) {
+      console.error("Insider report database operation failed", error);
+      return NextResponse.json(
+        { error: "Insider report service is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+
+    throw error;
   }
-
-  const result = await submitInsiderReport(db, {
-    listingId: parsed.data.listingId,
-    userId: principal.userId,
-    vote: parsed.data.vote,
-    comment: parsed.data.comment,
-  });
-
-  return NextResponse.json(
-    {
-      status: result.status,
-      listingStatus: result.listingStatus,
-      reviewNeeded: result.reviewNeeded,
-      guestSignal: result.guestSignal,
-    },
-    { status: result.status === "duplicate" ? 409 : 201 },
-  );
 }

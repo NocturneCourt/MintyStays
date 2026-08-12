@@ -4,6 +4,7 @@ import { z } from "zod";
 import { buildAuthOptions } from "@/lib/auth/authOptions";
 import { isAuthEnabled } from "@/lib/auth/featureFlag";
 import { canAccessEditor } from "@/lib/auth/roles";
+import { isServiceUnavailableError } from "@/lib/http/errors";
 import {
   EditorialInvariantError,
   EditorialListingNotFoundError,
@@ -23,6 +24,7 @@ const editorialUpdateSchema = z
       ])
       .nullable()
       .optional(),
+    reviewNeeded: z.boolean().optional(),
   })
   .strict();
 
@@ -60,9 +62,9 @@ export async function PATCH(
   }
 
   const { id } = await context.params;
-  const { db } = await import("@/db/client");
 
   try {
+    const { db } = await import("@/db/client");
     const listing = await updateEditorialListing(db, {
       listingId: id,
       ...parsed.data,
@@ -76,6 +78,14 @@ export async function PATCH(
 
     if (error instanceof EditorialInvariantError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (isServiceUnavailableError(error) || process.env.DATABASE_URL) {
+      console.error("Editorial listing update database operation failed", error);
+      return NextResponse.json(
+        { error: "Editorial service is temporarily unavailable" },
+        { status: 503 },
+      );
     }
 
     throw error;

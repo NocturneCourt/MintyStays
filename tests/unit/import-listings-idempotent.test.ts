@@ -47,17 +47,29 @@ describe("importListings idempotency", () => {
     ]);
   });
 
-  it("refreshes listing fields on upsert without wiping moderation state keys", () => {
+  it("refreshes source fields without wiping live signal or moderation state", () => {
     const row = toListingRow(seedListing, "city-1", "manual");
     const set = listingUpsertSet(row);
 
     expect(set.name).toBe("Cold Test Hotel");
-    expect(set.guestSignalStatus).toBe(row.guestSignalStatus);
     expect(set).not.toHaveProperty("source");
     expect(set).not.toHaveProperty("status");
     expect(set).not.toHaveProperty("reviewNeeded");
     expect(set).not.toHaveProperty("cityId");
     expect(set).not.toHaveProperty("sourceUrl");
+
+    for (const field of [
+      "guestSignalScore",
+      "guestSignalStatus",
+      "guestSignalConfidence",
+      "editorScore",
+      "isHandpicked",
+      "editorVerifiedAt",
+      "trustTier",
+      "reviewCountAnalyzed",
+    ]) {
+      expect(set).not.toHaveProperty(field);
+    }
   });
 
   it("re-running import upserts listings and does not double review rows", async () => {
@@ -69,16 +81,31 @@ describe("importListings idempotency", () => {
     };
 
     const state = createImportMockDb();
+    const recomputeCalls: string[] = [];
+    const recomputeListingSignals = async (_db: unknown, listingId: string) => {
+      recomputeCalls.push(listingId);
+    };
 
     const first = await importListingsFromSource(
       adapter,
       { citySlug: "lisbon" },
-      { db: state.db as never },
+      { db: state.db as never, recomputeListingSignals },
     );
+
+    Object.assign(state.listings[0], {
+      guestSignalScore: 91,
+      guestSignalStatus: "scored",
+      guestSignalConfidence: "high",
+      editorScore: "verified_cold",
+      isHandpicked: true,
+      trustTier: "editor_verified",
+      reviewNeeded: true,
+    });
+
     const second = await importListingsFromSource(
       adapter,
       { citySlug: "lisbon" },
-      { db: state.db as never },
+      { db: state.db as never, recomputeListingSignals },
     );
 
     expect(first).toHaveLength(1);
@@ -90,6 +117,16 @@ describe("importListings idempotency", () => {
     expect(state.rawReviews).toHaveLength(3);
     expect(state.coolingExtractions).toHaveLength(3);
     expect(state.reviewSignals).toHaveLength(3);
+    expect(recomputeCalls).toEqual(["listing-1", "listing-1"]);
+    expect(state.listings[0]).toMatchObject({
+      guestSignalScore: 91,
+      guestSignalStatus: "scored",
+      guestSignalConfidence: "high",
+      editorScore: "verified_cold",
+      isHandpicked: true,
+      trustTier: "editor_verified",
+      reviewNeeded: true,
+    });
   });
 });
 

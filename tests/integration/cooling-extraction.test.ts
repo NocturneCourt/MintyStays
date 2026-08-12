@@ -11,7 +11,9 @@ import {
   runCoolingExtraction,
   type ExtractedScrapedSignal,
   type ExtractionStore,
-  type SeededExtractionExcerpt,
+  type ExtractionQuarantine,
+  type RawExtractionReview,
+  type StoredCoolingExtraction,
 } from "@/lib/extraction/runExtraction";
 
 describe("cooling extraction pipeline", () => {
@@ -22,7 +24,7 @@ describe("cooling extraction pipeline", () => {
       excerpt("seed-2", "The central air conditioning did not work."),
       excerpt("seed-3", "Powerful cooling all night."),
       excerpt("seed-4", "Breakfast was excellent."),
-      excerpt("seed-5", "This one gets malformed model output."),
+      excerpt("seed-5", "This AC review gets malformed model output."),
     ]);
     const extractor = createCoolingExtractor({
       client: createQueuedAnthropicClient([
@@ -33,8 +35,8 @@ describe("cooling extraction pipeline", () => {
           "```",
         ].join("\n"),
         '{"mentions_cooling":true,"sentiment":"positive","ac_type_hint":null,"confidence":0.86}',
-        '{"mentions_cooling":false,"sentiment":"neutral","ac_type_hint":null,"confidence":0.76}',
         "not json",
+        "still not json",
       ]),
     });
 
@@ -49,7 +51,7 @@ describe("cooling extraction pipeline", () => {
     expect(result.quarantined).toMatchObject([
       {
         listingId: "listing-1",
-        excerptId: "seed-5",
+        rawReviewId: "seed-5",
       },
     ]);
     expect(store.insertedSignals).toMatchObject([
@@ -71,16 +73,24 @@ describe("cooling extraction pipeline", () => {
     ]);
     expect(result.listingResults[0]?.guestSignal.status).toBe("scored");
     expect(store.recomputedListingIds).toEqual(["listing-1"]);
+    expect(store.savedExtractions).toHaveLength(4);
+    expect(store.savedExtractions).toContainEqual(
+      expect.objectContaining({
+        rawReviewId: "seed-4",
+        mentionsCooling: false,
+        model: "keyword-prefilter",
+      }),
+    );
+    expect(store.quarantined).toHaveLength(1);
   });
 });
 
-function excerpt(id: string, rawExcerpt: string): SeededExtractionExcerpt {
+function excerpt(id: string, rawExcerpt: string): RawExtractionReview {
   return {
     id,
     listingId: "listing-1",
     rawExcerpt,
     authoredAt: new Date("2026-06-10T12:00:00Z"),
-    acTypeHint: null,
   };
 }
 
@@ -111,25 +121,36 @@ function createQueuedAnthropicClient(outputs: string[]): AnthropicCoolingClient 
 
 type MemoryExtractionStore = ExtractionStore & {
   insertedSignals: ExtractedScrapedSignal[];
+  savedExtractions: StoredCoolingExtraction[];
+  quarantined: ExtractionQuarantine[];
   recomputedListingIds: string[];
 };
 
-function createMemoryExtractionStore(excerpts: SeededExtractionExcerpt[]) {
+function createMemoryExtractionStore(excerpts: RawExtractionReview[]) {
   const store: MemoryExtractionStore = {
     insertedSignals: [] as ExtractedScrapedSignal[],
+    savedExtractions: [] as StoredCoolingExtraction[],
+    quarantined: [] as ExtractionQuarantine[],
     recomputedListingIds: [] as string[],
-    async loadSeededExcerpts() {
+    async loadRawReviews() {
       return excerpts;
     },
-    async replaceScrapedSignals(
-      _listingId: string,
-      signals: ExtractedScrapedSignal[],
+    async saveExtraction(
+      extraction: StoredCoolingExtraction,
+      signal?: ExtractedScrapedSignal,
     ) {
-      store.insertedSignals = signals;
+      store.savedExtractions.push(extraction);
+      if (signal) {
+        store.insertedSignals.push(signal);
+      }
+    },
+    async quarantineExtraction(quarantine: ExtractionQuarantine) {
+      store.quarantined.push(quarantine);
     },
     async recomputeListing(
       listingId: string,
       now: Date,
+      _extractionVersion: string,
     ): Promise<GuestSignalResult> {
       store.recomputedListingIds.push(listingId);
 

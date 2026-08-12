@@ -39,11 +39,24 @@ describe("contribution service helpers", () => {
     expect(
       getClientIpFromHeaders(
         new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" }),
+        { trustForwardedFor: true },
       ),
     ).toBe("203.0.113.9");
     expect(getClientIpFromHeaders(new Headers({ "x-real-ip": "198.51.100.2" }))).toBe(
       "198.51.100.2",
     );
+    expect(
+      getClientIpFromHeaders(
+        new Headers({
+          "x-real-ip": "198.51.100.2",
+          "x-forwarded-for": "203.0.113.9",
+        }),
+        { trustForwardedFor: true },
+      ),
+    ).toBe("198.51.100.2");
+    expect(
+      getClientIpFromHeaders(new Headers({ "x-forwarded-for": "203.0.113.9" })),
+    ).toBeNull();
     expect(getClientIpFromHeaders(new Headers())).toBeNull();
   });
 });

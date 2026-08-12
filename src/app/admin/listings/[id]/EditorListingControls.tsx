@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { EditorScore, TrustTier } from "@/lib/scoring/trustTier";
 
@@ -12,6 +13,7 @@ type EditableListing = {
   trustTier: TrustTier;
   guestSignalScore: number | null;
   guestSignalStatus: "unverified" | "scored";
+  reviewNeeded: boolean;
 };
 
 const editorScoreOptions: { value: EditorScore; label: string }[] = [
@@ -77,7 +79,14 @@ export function EditorListingControls({ listing }: { listing: EditableListing })
           ({listing.guestSignalStatus})
         </p>
         <p>Current trust tier: {formatTrustTier(trustTier)}</p>
+        {listing.reviewNeeded ? (
+          <p role="status">This listing is flagged for cooling review.</p>
+        ) : null}
       </div>
+
+      <Link className="secondary-link" href="/admin/reviews">
+        Open review queue
+      </Link>
 
       <label className="editor-checkbox">
         <input
