@@ -27,9 +27,13 @@ export function isAllowedAffiliateUrl(baseUrl: string): boolean {
   try {
     const url = new URL(baseUrl);
     const hostname = url.hostname.toLowerCase();
+    if (url.username || url.password) return false;
 
     if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return url.protocol === "http:" || url.protocol === "https:";
+      return (
+        process.env.NODE_ENV !== "production" &&
+        (url.protocol === "http:" || url.protocol === "https:")
+      );
     }
 
     if (url.protocol !== "https:") {

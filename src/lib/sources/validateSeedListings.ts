@@ -1,4 +1,5 @@
 import type { SeedListing } from "./ListingSourceAdapter";
+import { isAllowedAffiliateUrl } from "@/lib/affiliate/AffiliateLinkBuilder";
 
 export type SeedValidationIssue = {
   code: string;
@@ -64,8 +65,8 @@ export function validateSeedListings(
     const hasReviewEvidence = reviewExcerpts.length > 0;
     const hasEditorialStatus = Boolean(
       listing.editorial?.handpicked ||
-        listing.editorial?.editorVerified ||
-        listing.editorial?.editorScore,
+      listing.editorial?.editorVerified ||
+      listing.editorial?.editorScore,
     );
 
     if (expectedCitySlug && listing.citySlug !== expectedCitySlug) {
@@ -88,6 +89,15 @@ export function validateSeedListings(
     validateCoordinate(listing.lat, "listing.latitude", listingName, addError);
     validateCoordinate(listing.lng, "listing.longitude", listingName, addError);
     validateSourceUrls(listing, addWarning);
+
+    if (listing.affiliateBaseUrl && !isAllowedAffiliateUrl(listing.affiliateBaseUrl)) {
+      addWarning({
+        code: "listing.affiliate_url_not_allowlisted",
+        listingName,
+        message:
+          "Affiliate URL host is not allowlisted and will be rejected at click time.",
+      });
+    }
 
     if (!listing.affiliateBaseUrl) {
       addWarning({

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { ManualImportAdapter } from "@/lib/sources/ManualImportAdapter";
+import { seedListingSchema } from "@/lib/sources/ListingSourceAdapter";
 
 describe("ManualImportAdapter", () => {
   it("imports JSON seed files with city metadata and Booking-backed rows", async () => {
@@ -94,6 +95,33 @@ describe("ManualImportAdapter", () => {
     });
   });
 
+  it("imports optional photo fields without inventing licensing metadata", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mintystays-"));
+    const path = join(dir, "seed.csv");
+    await writeFile(
+      path,
+      [
+        "name,type,lat,lng,source,image_url,image_attribution,photo_gallery",
+        "Photo Stay,hotel,38.7,-9.1,manual,https://images.example.test/stay.jpg,Property supplied,https://images.example.test/room.jpg|https://images.example.test/lobby.jpg",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const listings = await new ManualImportAdapter().importCity({
+      citySlug: "lisbon",
+      path,
+    });
+
+    expect(listings[0]).toMatchObject({
+      imageUrl: "https://images.example.test/stay.jpg",
+      imageAttribution: "Property supplied",
+      photoGallery: [
+        { url: "https://images.example.test/room.jpg" },
+        { url: "https://images.example.test/lobby.jpg" },
+      ],
+    });
+  });
+
   it("imports CSV city metadata when present", async () => {
     const dir = await mkdtemp(join(tmpdir(), "mintystays-"));
     const path = join(dir, "seed.csv");
@@ -118,5 +146,54 @@ describe("ManualImportAdapter", () => {
       lng: -9.1393,
       isActive: true,
     });
+  });
+
+  it("rejects missing CSV coordinates instead of coercing them to zero", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mintystays-"));
+    const path = join(dir, "seed.csv");
+    await writeFile(
+      path,
+      [
+        "name,type,lat,lng,source,evidence_summary",
+        "Incomplete Stay,hotel,,-9.1,manual,Cold enough",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await expect(
+      new ManualImportAdapter().importCity({ citySlug: "lisbon", path }),
+    ).rejects.toThrow("CSV field lat is required");
+  });
+
+  it("rejects ambiguous CSV booleans", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mintystays-"));
+    const path = join(dir, "seed.csv");
+    await writeFile(
+      path,
+      [
+        "name,type,lat,lng,source,handpicked,evidence_summary",
+        "Ambiguous Stay,hotel,38.7,-9.1,manual,maybe,Cold enough",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await expect(
+      new ManualImportAdapter().importCity({ citySlug: "lisbon", path }),
+    ).rejects.toThrow("Invalid boolean value");
+  });
+
+  it("rejects non-http URL schemes in seed data", () => {
+    expect(() =>
+      seedListingSchema.parse({
+        citySlug: "lisbon",
+        name: "Unsafe Stay",
+        type: "hotel",
+        lat: 38.7,
+        lng: -9.1,
+        source: "manual",
+        imageUrl: "javascript:alert(1)",
+        reviewExcerpts: [],
+      }),
+    ).toThrow("URL must use http or https");
   });
 });

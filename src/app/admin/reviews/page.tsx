@@ -45,7 +45,7 @@ export default async function AdminReviewQueuePage() {
   }));
 
   return (
-    <main className="detail-shell">
+    <main id="main-content" className="detail-shell">
       <ReviewQueue initialItems={queueItems} />
     </main>
   );

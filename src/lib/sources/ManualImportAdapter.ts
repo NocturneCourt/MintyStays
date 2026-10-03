@@ -62,12 +62,15 @@ function parseCsvSeed(raw: string, citySlug: string): SeedListing[] {
       city: parseCsvCity(record),
       name: record.name,
       type: record.type,
-      lat: Number(record.lat),
-      lng: Number(record.lng),
+      lat: parseRequiredNumber(record.lat, "lat"),
+      lng: parseRequiredNumber(record.lng, "lng"),
       address: blankToUndefined(record.address),
       source: record.source || "manual",
       sourceUrl: blankToUndefined(record.source_url),
       affiliateBaseUrl: blankToUndefined(record.affiliate_base_url),
+      imageUrl: blankToUndefined(record.image_url),
+      imageAttribution: blankToUndefined(record.image_attribution),
+      photoGallery: parsePhotoGallery(record.photo_gallery),
       acType: blankToUndefined(record.ac_type),
       evidenceSummary: blankToUndefined(record.evidence_summary),
       evidenceSource: parseCsvEvidenceSource(record),
@@ -100,8 +103,8 @@ function parseCsvCity(record: Record<string, string>) {
   return {
     name,
     country,
-    lat: Number(lat),
-    lng: Number(lng),
+    lat: parseRequiredNumber(lat, "city_lat"),
+    lng: parseRequiredNumber(lng, "city_lng"),
     isActive: parseBoolean(record.city_is_active) ?? true,
   };
 }
@@ -131,7 +134,8 @@ function parseReviewExcerpts(record: Record<string, string>) {
   return texts.map((text, index) => ({
     text,
     authoredAt:
-      authoredDates[index] ?? (authoredDates.length === 1 ? authoredDates[0] : undefined),
+      authoredDates[index] ??
+      (authoredDates.length === 1 ? authoredDates[0] : undefined),
   }));
 }
 
@@ -140,8 +144,24 @@ function blankToUndefined(value?: string) {
 }
 
 function parseBoolean(value?: string) {
-  if (!value) return undefined;
-  return ["true", "1", "yes", "y"].includes(value.toLowerCase());
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (["true", "1", "yes", "y"].includes(normalized)) return true;
+  if (["false", "0", "no", "n"].includes(normalized)) return false;
+  throw new Error(`Invalid boolean value: ${value}`);
+}
+
+function parseRequiredNumber(value: string | undefined, field: string) {
+  if (!value?.trim()) {
+    throw new Error(`CSV field ${field} is required`);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`CSV field ${field} must be a finite number`);
+  }
+
+  return parsed;
 }
 
 function splitList(value?: string) {
@@ -150,4 +170,9 @@ function splitList(value?: string) {
     .split("|")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parsePhotoGallery(value?: string) {
+  const urls = splitList(value);
+  return urls.length ? urls.map((url) => ({ url })) : undefined;
 }

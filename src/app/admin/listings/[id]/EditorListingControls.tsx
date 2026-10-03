@@ -39,31 +39,38 @@ export function EditorListingControls({ listing }: { listing: EditableListing })
     setMessage(null);
 
     startTransition(async () => {
-      const response = await fetch(`/api/editor/listings/${listing.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          isHandpicked,
-          editorVerified,
-          editorScore: editorScore || null,
-        }),
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | { listing?: EditableListing; error?: string }
-        | null;
+      try {
+        const response = await fetch(`/api/editor/listings/${listing.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            isHandpicked,
+            editorVerified,
+            editorScore: editorScore || null,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as {
+          listing?: EditableListing;
+          error?: string;
+        } | null;
 
-      if (!response.ok) {
-        setMessage(payload?.error ?? "Editorial update failed");
-        return;
+        if (!response.ok) {
+          setMessage(payload?.error ?? "Editorial update failed");
+          return;
+        }
+
+        if (payload?.listing) {
+          setTrustTier(payload.listing.trustTier);
+        }
+
+        setMessage("Editorial fields saved");
+      } catch {
+        setMessage(
+          "Could not save editorial fields. Check your connection and try again.",
+        );
       }
-
-      if (payload?.listing) {
-        setTrustTier(payload.listing.trustTier);
-      }
-
-      setMessage("Editorial fields saved");
     });
   }
 
@@ -132,7 +139,11 @@ export function EditorListingControls({ listing }: { listing: EditableListing })
         {isPending ? "Saving" : "Save editorial fields"}
       </button>
 
-      {message ? <p className="form-message">{message}</p> : null}
+      {message ? (
+        <p className="form-message" role="status">
+          {message}
+        </p>
+      ) : null}
     </section>
   );
 }

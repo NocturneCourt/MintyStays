@@ -17,8 +17,8 @@ export default function Image() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#eef7f4",
-          color: "#10181c",
+          background: "#eef3f6",
+          color: "#0b1417",
           padding: 64,
           fontFamily: "Georgia, serif",
         }}
@@ -39,9 +39,9 @@ export default function Image() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              border: "2px solid #087866",
+              border: "2px solid #0e7c6b",
               borderRadius: 12,
-              color: "#087866",
+              color: "#0e7c6b",
               fontSize: 34,
             }}
           >
@@ -52,7 +52,7 @@ export default function Image() {
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div
             style={{
-              color: "#087866",
+              color: "#0e7c6b",
               fontFamily: "Arial, sans-serif",
               fontSize: 22,
               fontWeight: 800,
@@ -83,9 +83,9 @@ export default function Image() {
           }}
         >
           <span>Guest Signal</span>
-          <span style={{ color: "#087866" }}>/</span>
+          <span style={{ color: "#0e7c6b" }}>/</span>
           <span>Editor Score</span>
-          <span style={{ color: "#087866" }}>/</span>
+          <span style={{ color: "#0e7c6b" }}>/</span>
           <span>Map-first</span>
         </div>
       </div>

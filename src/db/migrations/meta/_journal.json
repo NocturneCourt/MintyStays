@@ -36,6 +36,20 @@
       "when": 1785216000000,
       "tag": "0004_dispute_review_needed",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788040478933,
+      "tag": "0005_pale_scourge",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788040910854,
+      "tag": "0006_brown_black_tarantula",
+      "breakpoints": true
     }
   ]
 }

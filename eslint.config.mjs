@@ -11,6 +11,7 @@ const eslintConfig = [
       "coverage/**",
       "test-results/**",
       "playwright-report/**",
+      "public/maplibre/**",
       "*.min.js",
     ],
   },

@@ -1,5 +1,8 @@
 import type { CoolingSentiment } from "./guestSignalFormula";
 
+const COOLING_VOCABULARY =
+  /\b(a\/?c|air[- ]?con(?:ditioning)?|cooling|cold|hot|stuffy|stifling|fan|sweat|temperature)\b/i;
+
 const NEGATIVE_PATTERNS = [
   /\b(ac|a\/c|air conditioning)\b.{0,40}\b(broken|weak|too warm|too hot)\b/i,
   /\b(broken|weak|too warm|too hot)\b.{0,40}\b(ac|a\/c|air conditioning)\b/i,
@@ -22,4 +25,8 @@ export function inferCoolingSentiment(excerpt: string): CoolingSentiment {
   }
 
   return "neutral";
+}
+
+export function mentionsCoolingVocabulary(excerpt: string) {
+  return COOLING_VOCABULARY.test(excerpt);
 }

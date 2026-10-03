@@ -26,42 +26,49 @@ export function AnonymousContributionForm({
     event.preventDefault();
     setState({ kind: "submitting", message: "Saving your cooling report..." });
 
-    const response = await fetch("/api/contributions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        listingId,
-        vote,
-        comment: comment.trim() || undefined,
-      }),
-    });
-
-    if (response.status === 409) {
-      setState({
-        kind: "duplicate",
-        message: "You already sent a cooling report for this listing.",
+    try {
+      const response = await fetch("/api/contributions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId,
+          vote,
+          comment: comment.trim() || undefined,
+        }),
       });
-      return;
-    }
 
-    if (!response.ok) {
+      if (response.status === 409) {
+        setState({
+          kind: "duplicate",
+          message: "You already sent a cooling report for this listing.",
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        setState({
+          kind: "error",
+          message: "Could not save that report. Try again in a moment.",
+        });
+        return;
+      }
+
+      setState({
+        kind: "success",
+        message:
+          vote === "confirm_cold"
+            ? "Thanks. Your cold-room confirmation was recorded."
+            : "Thanks. This listing is flagged for cooling review.",
+      });
+      setComment("");
+    } catch {
       setState({
         kind: "error",
-        message: "Could not save that report. Try again in a moment.",
+        message: "Could not save that report. Check your connection and try again.",
       });
-      return;
     }
-
-    setState({
-      kind: "success",
-      message:
-        vote === "confirm_cold"
-          ? "Thanks. Your cold-room confirmation was recorded."
-          : "Thanks. This listing is flagged for cooling review.",
-    });
-    setComment("");
   }
 
   return (
@@ -69,8 +76,8 @@ export function AnonymousContributionForm({
       <div>
         <h2>How was the cooling?</h2>
         <p className="score-note">
-          Anonymous reports feed the Guest Signal layer and stay separate from
-          Editor Score.
+          Anonymous reports feed the Guest Signal layer and stay separate from Editor
+          Score.
         </p>
       </div>
       <fieldset>

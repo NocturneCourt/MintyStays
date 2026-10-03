@@ -54,4 +54,34 @@ describe("GET /api/affiliate-click", () => {
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/not allowlisted|not allowed/i);
   });
+
+  it("still redirects when click analytics are unavailable", async () => {
+    vi.stubEnv("DATABASE_URL", "postgres://user:pass@localhost/mintystays");
+    vi.stubEnv("NODE_ENV", "test");
+
+    vi.doMock("@/lib/listings/getListingDetail", () => ({
+      getListingDetail: vi.fn().mockResolvedValue({
+        id: "11111111-1111-4111-8111-111111111111",
+        affiliateUrl: "https://www.booking.com/hotel/pt/cold-stay.html",
+      }),
+    }));
+    vi.doMock("@/db/client", () => ({
+      db: {
+        insert: vi.fn(() => ({
+          values: vi.fn().mockRejectedValue(new Error("analytics offline")),
+        })),
+      },
+    }));
+    vi.doMock("@/db/schema", () => ({ clickEvents: {} }));
+
+    const { GET } = await import("@/app/api/affiliate-click/route");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/affiliate-click?id=11111111-1111-4111-8111-111111111111",
+      ),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("booking.com");
+  });
 });

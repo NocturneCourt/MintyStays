@@ -8,6 +8,7 @@ import type { PublicListing } from "@/lib/listings/types";
 import { ScoreRows } from "./ScoreRows";
 import { SignalsConflictNotice } from "./SignalsConflictNotice";
 import { TrustBadge } from "./TrustBadge";
+import { ListingImage } from "./ListingImage";
 
 export function ListingCard({
   listing,
@@ -35,6 +36,7 @@ export function ListingCard({
         onClick={onSelect}
       >
         <div className="listing-visual">
+          <ListingImage listing={listing} variant="card" />
           <span className="cold-chip">
             {listing.guestSignalScore != null
               ? `${listing.guestSignalScore} Guest Signal`

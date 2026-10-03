@@ -6,10 +6,13 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MintyStays",
     description:
       "Map-first discovery for hotels and rentals with genuinely effective cooling.",
+    id: "/",
     start_url: "/",
+    scope: "/",
+    lang: "en",
     display: "standalone",
-    background_color: "#eef7f4",
-    theme_color: "#087866",
+    background_color: "#eef3f6",
+    theme_color: "#0e7c6b",
     icons: [
       {
         src: "/icon.svg",

@@ -18,9 +18,14 @@ export default async function PublicPage({ searchParams }: PublicPageProps) {
   const listings = await getPublicListings(filters);
   const styleUrl =
     process.env.MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/positron";
+  const darkStyleUrl =
+    process.env.MAP_STYLE_URL_DARK ??
+    (process.env.MAP_STYLE_URL
+      ? process.env.MAP_STYLE_URL
+      : "https://tiles.openfreemap.org/styles/dark");
 
   return (
-    <main className="app-shell">
+    <main id="main-content" className="app-shell">
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
@@ -48,6 +53,7 @@ export default async function PublicPage({ searchParams }: PublicPageProps) {
         listings={listings}
         filters={filters}
         styleUrl={styleUrl}
+        darkStyleUrl={darkStyleUrl}
       />
     </main>
   );

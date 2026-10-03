@@ -10,7 +10,10 @@ import type { DbClient } from "@/db/client";
 import { hashReviewContent } from "@/lib/extraction/contentHash";
 import { getCoolingExtractionVersion } from "@/lib/extraction/version";
 import { calculateGuestSignal } from "@/lib/scoring/guestSignalFormula";
-import { inferCoolingSentiment } from "@/lib/scoring/inferCoolingSentiment";
+import {
+  inferCoolingSentiment,
+  mentionsCoolingVocabulary,
+} from "@/lib/scoring/inferCoolingSentiment";
 import { recomputeListingSignals as recomputeStoredListingSignals } from "@/lib/scoring/recomputeListingSignals";
 import { deriveTrustTier } from "@/lib/scoring/trustTier";
 import type { ListingSourceAdapter, SeedListing } from "./ListingSourceAdapter";
@@ -23,9 +26,7 @@ export const LISTING_NATURAL_KEY = [
 ] as const;
 
 type ImportDb = {
-  transaction: <T>(
-    callback: (tx: ImportTransaction) => Promise<T>,
-  ) => Promise<T>;
+  transaction: <T>(callback: (tx: ImportTransaction) => Promise<T>) => Promise<T>;
 };
 
 type ImportTransaction = {
@@ -47,10 +48,7 @@ type ImportTransaction = {
 
 type ImportOptions = {
   db?: ImportDb;
-  recomputeListingSignals?: (
-    db: DbClient,
-    listingId: string,
-  ) => Promise<unknown>;
+  recomputeListingSignals?: (db: DbClient, listingId: string) => Promise<unknown>;
 };
 
 export async function importListingsFromSource(
@@ -98,11 +96,7 @@ export async function importListingsFromSource(
     const imported = [];
 
     for (const seedListing of seedListings) {
-      const newListing = toListingRow(
-        seedListing,
-        upsertedCity.id,
-        adapter.sourceName,
-      );
+      const newListing = toListingRow(seedListing, upsertedCity.id, adapter.sourceName);
       const [upsertedListing] = await tx
         .insert(listings)
         .values(newListing)
@@ -135,14 +129,17 @@ export async function importListingsFromSource(
           continue;
         }
 
-        const coolingSentiment = inferCoolingSentiment(excerpt.text);
+        const mentionsCooling = mentionsCoolingVocabulary(excerpt.text);
+        const coolingSentiment = mentionsCooling
+          ? inferCoolingSentiment(excerpt.text)
+          : "neutral";
 
         await tx
           .insert(coolingExtractions)
           .values({
             rawReviewId: rawReview.id,
             extractionVersion: getCoolingExtractionVersion(),
-            mentionsCooling: true,
+            mentionsCooling,
             coolingSentiment,
             acTypeHint: seedListing.acType,
             confidence: "1.000",
@@ -156,6 +153,8 @@ export async function importListingsFromSource(
             ],
           })
           .returning();
+
+        if (!mentionsCooling) continue;
 
         await tx
           .insert(reviewSignals)
@@ -196,6 +195,9 @@ export function listingUpsertSet(newListing: NewListing) {
     lng: newListing.lng,
     address: newListing.address,
     affiliateUrl: newListing.affiliateUrl,
+    imageUrl: newListing.imageUrl,
+    imageAttribution: newListing.imageAttribution,
+    photoGallery: newListing.photoGallery,
     acType: newListing.acType,
     evidenceSummary: newListing.evidenceSummary,
     lastSeededAt: newListing.lastSeededAt,
@@ -211,8 +213,11 @@ export function toListingRow(
   const editorVerifiedAt = seedListing.editorial?.editorVerified
     ? new Date()
     : undefined;
+  const coolingExcerpts = seedListing.reviewExcerpts.filter((excerpt) =>
+    mentionsCoolingVocabulary(excerpt.text),
+  );
   const guestSignal = calculateGuestSignal(
-    seedListing.reviewExcerpts.map((excerpt) => ({
+    coolingExcerpts.map((excerpt) => ({
       source: "scraped",
       sentiment: inferCoolingSentiment(excerpt.text),
       rawExcerpt: excerpt.text,
@@ -230,6 +235,9 @@ export function toListingRow(
     source: sourceName,
     sourceUrl: seedListing.sourceUrl,
     affiliateUrl: seedListing.affiliateBaseUrl,
+    imageUrl: seedListing.imageUrl,
+    imageAttribution: seedListing.imageAttribution,
+    photoGallery: seedListing.photoGallery,
     acType: seedListing.acType,
     guestSignalScore: guestSignal.score,
     guestSignalStatus: guestSignal.status,
@@ -244,7 +252,7 @@ export function toListingRow(
       editorVerifiedAt,
     }),
     evidenceSummary: seedListing.evidenceSummary,
-    reviewCountAnalyzed: seedListing.reviewExcerpts.length,
+    reviewCountAnalyzed: coolingExcerpts.length,
     lastSeededAt: new Date(),
     status: "active",
   };

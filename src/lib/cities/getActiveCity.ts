@@ -16,9 +16,9 @@ export async function getActiveCity() {
 
     const city = getSeedCity();
 
-    if (city.slug !== launchCitySlug) {
+    if (city.slug !== launchCitySlug || !city.isActive) {
       throw new Error(
-        `No seed data is available for launch city ${launchCitySlug}`,
+        `No active seed data is available for launch city ${launchCitySlug}`,
       );
     }
 
@@ -26,7 +26,7 @@ export async function getActiveCity() {
   }
 
   try {
-    const [{ db }, { cities }, { eq }] = await Promise.all([
+    const [{ db }, { cities }, { and, eq }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
       import("drizzle-orm"),
@@ -34,7 +34,7 @@ export async function getActiveCity() {
     const [city] = await db
       .select()
       .from(cities)
-      .where(eq(cities.slug, launchCitySlug))
+      .where(and(eq(cities.slug, launchCitySlug), eq(cities.isActive, true)))
       .limit(1);
 
     if (city) {

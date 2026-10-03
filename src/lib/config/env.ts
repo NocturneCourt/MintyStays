@@ -8,6 +8,7 @@ const envSchema = z.object({
   EMAIL_PROVIDER_API_KEY: z.string().optional(),
   LAUNCH_CITY_SLUG: z.string().min(1).default("lisbon"),
   MAP_STYLE_URL: z.string().url().optional(),
+  MAP_STYLE_URL_DARK: z.string().url().optional(),
   NEXTAUTH_URL: z.string().url().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
 });
@@ -31,6 +32,7 @@ export function checkLaunchEnv(
     EMAIL_PROVIDER_API_KEY: blankToUndefined(env["EMAIL_PROVIDER_API_KEY"]),
     LAUNCH_CITY_SLUG: env["LAUNCH_CITY_SLUG"] || "lisbon",
     MAP_STYLE_URL: blankToUndefined(env["MAP_STYLE_URL"]),
+    MAP_STYLE_URL_DARK: blankToUndefined(env["MAP_STYLE_URL_DARK"]),
     NEXTAUTH_URL: blankToUndefined(env["NEXTAUTH_URL"]),
     NEXT_PUBLIC_SITE_URL: env["NEXT_PUBLIC_SITE_URL"] || "http://localhost:3000",
   };
@@ -41,7 +43,9 @@ export function checkLaunchEnv(
   const value = parsed.success ? parsed.data : envSchema.parse({});
   const warnings: string[] = [];
 
-  if (!value.DATABASE_URL) {
+  if (env.NODE_ENV === "production" && !value.DATABASE_URL) {
+    errors.push("DATABASE_URL is required in production.");
+  } else if (!value.DATABASE_URL) {
     warnings.push(
       "DATABASE_URL is not set; public pages use local seed data only outside production.",
     );
@@ -69,7 +73,14 @@ export function checkLaunchEnv(
     warnings.push("AUTH_SECRET should be set before deploy, even with auth hidden.");
   }
 
-  if (!value.NEXT_PUBLIC_SITE_URL.includes("mintystays.com")) {
+  if (
+    env.NODE_ENV === "production" &&
+    new URL(value.NEXT_PUBLIC_SITE_URL).protocol !== "https:"
+  ) {
+    errors.push("NEXT_PUBLIC_SITE_URL must use HTTPS in production.");
+  }
+
+  if (new URL(value.NEXT_PUBLIC_SITE_URL).hostname !== "mintystays.com") {
     warnings.push("NEXT_PUBLIC_SITE_URL is not mintystays.com.");
   }
 

@@ -16,6 +16,7 @@ type TestState = {
 };
 
 type TestTransaction = {
+  select: () => unknown;
   insert: (table: unknown) => {
     values: (row: StoredRow) => Promise<void>;
   };
@@ -172,6 +173,7 @@ function createInsiderReportTestDb() {
   };
 
   const transaction: TestTransaction = {
+    select,
     insert(table) {
       return {
         async values(row) {
@@ -207,24 +209,29 @@ function createInsiderReportTestDb() {
     },
   };
 
-  const db = {
-    select() {
-      const query = {
-        from() {
-          return query;
-        },
-        where() {
-          return query;
-        },
-        async limit() {
-          return state.contributions.length
-            ? [{ id: state.contributions[0]?.id ?? "existing" }]
-            : [];
-        },
-      };
+  function select() {
+    const query = {
+      from() {
+        return query;
+      },
+      where() {
+        return query;
+      },
+      for() {
+        return Promise.resolve([]);
+      },
+      async limit() {
+        return state.contributions.length
+          ? [{ id: state.contributions[0]?.id ?? "existing" }]
+          : [];
+      },
+    };
 
-      return query;
-    },
+    return query;
+  }
+
+  const db = {
+    select,
     async transaction<T>(callback: (tx: TestTransaction) => Promise<T>) {
       return callback(transaction);
     },

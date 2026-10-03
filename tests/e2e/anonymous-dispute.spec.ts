@@ -1,11 +1,25 @@
 import { expect, test } from "@playwright/test";
 
+test("a network failure leaves the cooling report form ready to retry", async ({
+  page,
+}) => {
+  await page.goto("/listings/lisbon-art-stay-hotel-apartments-1");
+  await page.route("**/api/contributions", (route) => route.abort("failed"));
+  await page.getByLabel("Optional note").fill("The room stayed cold.");
+  await page.getByRole("button", { name: "Send report" }).click();
+  await expect(page.getByRole("status")).toContainText("Check your connection");
+  await expect(page.getByRole("button", { name: "Send report" })).toBeEnabled();
+  await expect(page.getByLabel("Optional note")).toHaveValue("The room stayed cold.");
+});
+
 test("anonymous visitor disputes weak cooling once per listing session", async ({
   page,
 }) => {
   await page.goto("/listings/lisbon-art-stay-hotel-apartments-1");
 
-  await expect(page.getByRole("heading", { name: "How was the cooling?" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "How was the cooling?" }),
+  ).toBeVisible();
   await page.getByLabel("Dispute weak").check();
   await page
     .getByLabel("Optional note")

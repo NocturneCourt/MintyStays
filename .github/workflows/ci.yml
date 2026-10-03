@@ -9,6 +9,20 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mintystays
+          POSTGRES_PASSWORD: mintystays
+          POSTGRES_DB: mintystays_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mintystays -d mintystays_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       AUTH_ENABLED: "false"
       LAUNCH_CITY_SLUG: lisbon
@@ -39,7 +53,7 @@ jobs:
         run: pnpm env:check
 
       - name: Validate seed
-        run: pnpm seed:validate
+        run: pnpm seed:validate -- --strict
 
       - name: Typecheck
         run: pnpm typecheck
@@ -49,6 +63,14 @@ jobs:
 
       - name: Unit and integration tests
         run: pnpm test
+
+      - name: Migrations and PostgreSQL regressions
+        env:
+          DATABASE_URL: postgres://mintystays:mintystays@127.0.0.1:5432/mintystays_test
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
+          pnpm test:postgres
 
       - name: Build
         run: pnpm build

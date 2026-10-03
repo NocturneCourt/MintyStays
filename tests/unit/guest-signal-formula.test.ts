@@ -55,10 +55,7 @@ describe("calculateGuestSignal", () => {
   });
 
   it("applies a hard penalty for trailing broken AC mentions", () => {
-    const healthy = calculateGuestSignal(
-      [signal(), signal(), signal(), signal()],
-      now,
-    );
+    const healthy = calculateGuestSignal([signal(), signal(), signal(), signal()], now);
     const broken = calculateGuestSignal(
       [
         signal(),
@@ -81,9 +78,34 @@ describe("calculateGuestSignal", () => {
     expect(broken.score).toBeLessThan(healthy.score);
   });
 
+  it("does not penalize positive or neutral references to repaired broken AC", () => {
+    for (const sentiment of ["positive", "neutral"] as const) {
+      const result = calculateGuestSignal(
+        [
+          signal(),
+          signal(),
+          signal({
+            sentiment,
+            rawExcerpt: "The broken AC was replaced and now works well.",
+          }),
+        ],
+        now,
+      );
+      expect(result.brokenPenaltyApplied).toBe(false);
+    }
+    const result = calculateGuestSignal(
+      [signal(), signal(), signal({ sentiment: "negative", vote: "broken" })],
+      now,
+    );
+    expect(result.brokenPenaltyApplied).toBe(true);
+  });
+
   it("discounts tiny samples against larger solid samples", () => {
     const tiny = calculateGuestSignal([signal(), signal(), signal()], now);
-    const larger = calculateGuestSignal(Array.from({ length: 12 }, () => signal()), now);
+    const larger = calculateGuestSignal(
+      Array.from({ length: 12 }, () => signal()),
+      now,
+    );
 
     expect(tiny.status).toBe("scored");
     expect(larger.status).toBe("scored");

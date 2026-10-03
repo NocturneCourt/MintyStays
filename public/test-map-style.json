@@ -1,13 +1,34 @@
 {
   "version": 8,
   "name": "MintyStays Test",
-  "sources": {},
+  "sources": {
+    "test-point": {
+      "type": "geojson",
+      "data": {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [-9.1393, 38.7223]
+        },
+        "properties": {}
+      }
+    }
+  },
   "layers": [
     {
       "id": "background",
       "type": "background",
       "paint": {
         "background-color": "#edf4f1"
+      }
+    },
+    {
+      "id": "test-point",
+      "type": "circle",
+      "source": "test-point",
+      "paint": {
+        "circle-radius": 2,
+        "circle-color": "#edf4f1"
       }
     }
   ]

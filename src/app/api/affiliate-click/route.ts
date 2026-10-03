@@ -42,7 +42,12 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    await recordClickIfDatabaseExists(listing.id);
+    try {
+      await recordClickIfDatabaseExists(listing.id);
+    } catch (error) {
+      // Analytics must never prevent a user from reaching the booking page.
+      console.error("Affiliate click could not be recorded", error);
+    }
 
     return NextResponse.redirect(trackedUrl);
   } catch (error) {

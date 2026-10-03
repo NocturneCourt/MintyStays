@@ -1,6 +1,9 @@
 import rawSeed from "@/db/seed/minty-launch-city.json";
 import { calculateGuestSignal } from "@/lib/scoring/guestSignalFormula";
-import { inferCoolingSentiment } from "@/lib/scoring/inferCoolingSentiment";
+import {
+  inferCoolingSentiment,
+  mentionsCoolingVocabulary,
+} from "@/lib/scoring/inferCoolingSentiment";
 import { hasSignalsConflict } from "@/lib/scoring/signalsConflict";
 import { deriveTrustTier } from "@/lib/scoring/trustTier";
 import { seedFileSchema } from "@/lib/sources/ListingSourceAdapter";
@@ -23,9 +26,12 @@ export function getSeedCity(): PublicCity {
 export function getSeedListings(): PublicListing[] {
   const city = getSeedCity();
 
-  return seed.listings.map((listing, index) => {
+  return seed.listings.filter(isPublicSeedListing).map((listing, index) => {
+    const coolingExcerpts = listing.reviewExcerpts.filter((excerpt) =>
+      mentionsCoolingVocabulary(excerpt.text),
+    );
     const guestSignal = calculateGuestSignal(
-      listing.reviewExcerpts.map((excerpt) => ({
+      coolingExcerpts.map((excerpt) => ({
         source: "scraped",
         sentiment: inferCoolingSentiment(excerpt.text),
         rawExcerpt: excerpt.text,
@@ -55,6 +61,9 @@ export function getSeedListings(): PublicListing[] {
       source: listing.source,
       sourceUrl: listing.sourceUrl,
       affiliateUrl: listing.affiliateBaseUrl,
+      imageUrl: listing.imageUrl,
+      imageAttribution: listing.imageAttribution,
+      photoGallery: listing.photoGallery,
       acType: listing.acType,
       guestSignalScore: guestSignal.score,
       guestSignalStatus: guestSignal.status,
@@ -68,9 +77,20 @@ export function getSeedListings(): PublicListing[] {
       evidenceSummary:
         listing.evidenceSummary ??
         "Cooling evidence exists for this seed listing, but no summary was provided.",
-      reviewCountAnalyzed: listing.reviewExcerpts.length,
+      reviewCountAnalyzed: coolingExcerpts.length,
     };
   });
+}
+
+function isPublicSeedListing(listing: (typeof seed.listings)[number]) {
+  return Boolean(
+    listing.evidenceSummary?.trim() ||
+    listing.reviewExcerpts.some((excerpt) =>
+      mentionsCoolingVocabulary(excerpt.text),
+    ) ||
+    listing.editorial?.handpicked ||
+    (listing.editorial?.editorVerified && listing.editorial.editorScore),
+  );
 }
 
 function parseSeedDate(value?: string) {

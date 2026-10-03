@@ -10,6 +10,8 @@ This runbook covers the day-one public deploy for `mintystays.com` with
 - `LAUNCH_CITY_SLUG=lisbon`: active MVP city.
 - `MAP_STYLE_URL`: optional MapLibre style URL. Defaults to OpenFreeMap
   Positron when unset.
+- `MAP_STYLE_URL_DARK`: optional Night Frost MapLibre style URL. Defaults to
+  OpenFreeMap Dark when unset.
 - `AFFILIATE_DEFAULT_PROVIDER`: `generic` or `booking`.
 - `AFFILIATE_BOOKING_PARTNER_ID`: partner ID when Booking.com links are used.
 - `NEXT_PUBLIC_SITE_URL=https://mintystays.com`: canonical public URL.
@@ -17,16 +19,18 @@ This runbook covers the day-one public deploy for `mintystays.com` with
 - `AUTH_SECRET`: set before enabling auth, even while auth is hidden.
 - `EMAIL_FROM` and `EMAIL_PROVIDER_API_KEY`: required before auth flag flip.
 - `ANTHROPIC_API_KEY`: required for extraction jobs.
-- `TRUSTED_PROXY_HEADERS=false`: keep disabled unless an additional proxy is
-  verified to sanitize `X-Forwarded-For`; Railway's documented `X-Real-IP`
-  header is used by default.
+- `TRUSTED_PROXY_HEADERS=false`: keep disabled until the ingress is verified to
+  overwrite client-supplied `X-Real-IP` and `X-Forwarded-For`. With this disabled,
+  anonymous duplicate protection uses the session cookie; IP throttling requires
+  a verified proxy. Test spoofed headers before enabling it.
 
 ## First Deploy
 
 1. Provision a Railway PostgreSQL database.
 2. Set the variables above in Railway.
 3. Deploy the app from the GitHub repository.
-4. Run migrations:
+4. `railway.json` validates production settings, applies migrations before the
+   new deployment starts, and checks `/api/health`. For a manual migration:
 
    ```sh
    DATABASE_URL="$DATABASE_URL" pnpm db:migrate
@@ -40,6 +44,34 @@ This runbook covers the day-one public deploy for `mintystays.com` with
 
 6. Open `https://mintystays.com` and verify the Lisbon map, listing cards,
    detail pages, anonymous report form, and affiliate redirects.
+
+Use the deployed service's actual HTTPS origin for `NEXT_PUBLIC_SITE_URL` and
+`NEXTAUTH_URL` until the custom domain is connected. Never use the local fallback
+dataset as production storage.
+
+## Score Refresh and Recovery
+
+After a scoring correction, or a failed extraction job that already saved its
+classifications, refresh stored scores without importing or extracting again:
+
+```sh
+DATABASE_URL="$DATABASE_URL" LAUNCH_CITY_SLUG=lisbon pnpm signals:recompute
+```
+
+Each listing refresh is transactional and preserves editorial fields. The command
+is safe to rerun if interrupted. The October 3, 2026 correction limits text-based
+broken-AC penalties to negative signals, as specified in the implementation plan.
+Existing databases need this refresh after deploying the correction.
+
+## Deployed Smoke Check
+
+```sh
+PLAYWRIGHT_BASE_URL=https://mintystays.com pnpm test:e2e
+```
+
+An external base URL selects the read-only deployed suite. It discovers database
+listing IDs and verifies health, public pages, detail metadata, and mobile layout.
+The local suite exercises writes against disposable data only.
 
 ## Local Railway-Like Verification
 

@@ -1,17 +1,12 @@
-import { eq } from "drizzle-orm";
-import {
-  ServiceUnavailableError,
-  shouldFailClosedOnDbError,
-} from "@/lib/http/errors";
+import { and, eq, ne, or, sql } from "drizzle-orm";
+import { ServiceUnavailableError, shouldFailClosedOnDbError } from "@/lib/http/errors";
 import { mapDbListingToPublicListing } from "./mapDbListing";
 import { getSeedListings } from "./seedData";
 
 export async function getListingDetail(id: string) {
   if (!process.env.DATABASE_URL) {
     if (shouldFailClosedOnDbError()) {
-      throw new ServiceUnavailableError(
-        "DATABASE_URL is required in production",
-      );
+      throw new ServiceUnavailableError("DATABASE_URL is required in production");
     }
     return getSeedListings().find((listing) => listing.id === id) ?? null;
   }
@@ -22,14 +17,25 @@ export async function getListingDetail(id: string) {
   }
 
   try {
-    const [{ db }, { listings }] = await Promise.all([
+    const [{ db }, { cities, listings }] = await Promise.all([
       import("@/db/client"),
       import("@/db/schema"),
     ]);
     const [listing] = await db
       .select()
       .from(listings)
-      .where(eq(listings.id, id))
+      .where(
+        and(
+          eq(listings.id, id),
+          eq(listings.status, "active"),
+          sql`${listings.cityId} IN (SELECT ${cities.id} FROM ${cities} WHERE ${cities.slug} = ${process.env.LAUNCH_CITY_SLUG ?? "lisbon"} AND ${cities.isActive} = true)`,
+          or(
+            sql`${listings.evidenceSummary} IS NOT NULL AND btrim(${listings.evidenceSummary}) <> ''`,
+            sql`${listings.reviewCountAnalyzed} > 0`,
+            ne(listings.trustTier, "unverified"),
+          ),
+        ),
+      )
       .limit(1);
 
     if (listing) {
@@ -43,9 +49,7 @@ export async function getListingDetail(id: string) {
     }
 
     console.error("Listing detail database query failed", error);
-    throw new ServiceUnavailableError(
-      "Listing data is temporarily unavailable",
-    );
+    throw new ServiceUnavailableError("Listing data is temporarily unavailable");
   }
 }
 

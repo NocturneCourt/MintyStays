@@ -6,15 +6,96 @@ const databaseConfigured = Boolean(process.env.DATABASE_URL);
 let closeDatabase: (() => Promise<unknown>) | undefined;
 
 describe.skipIf(!databaseConfigured)("PostgreSQL smoke path", () => {
+  it("enforces public visibility on list and direct detail requests", async () => {
+    const [
+      { db, sql: postgresClient },
+      { cities, listings },
+      { eq },
+      { getListingDetail },
+      { getPublicListings },
+    ] = await Promise.all([
+      import("@/db/client"),
+      import("@/db/schema"),
+      import("drizzle-orm"),
+      import("@/lib/listings/getListingDetail"),
+      import("@/lib/listings/getPublicListings"),
+    ]);
+    closeDatabase = () => postgresClient.end({ timeout: 5 });
+    const [launchCity] = await db
+      .select()
+      .from(cities)
+      .where(eq(cities.slug, process.env.LAUNCH_CITY_SLUG ?? "lisbon"))
+      .limit(1);
+    expect(launchCity).toBeTruthy();
+    const fixtureIds: string[] = [];
+    const [otherCity] = await db
+      .insert(cities)
+      .values({
+        slug: `visibility-${randomUUID()}`,
+        name: "Hidden city",
+        country: "Portugal",
+        lat: launchCity.lat,
+        lng: launchCity.lng,
+        isActive: false,
+      })
+      .returning();
+    try {
+      const base = {
+        cityId: launchCity.id,
+        name: "Visibility fixture",
+        type: "hotel" as const,
+        lat: launchCity.lat,
+        lng: launchCity.lng,
+        source: "visibility-test",
+      };
+      const fixtures = await db
+        .insert(listings)
+        .values([
+          { ...base, evidenceSummary: "   " },
+          { ...base, evidenceSummary: "", reviewCountAnalyzed: 1 },
+          {
+            ...base,
+            evidenceSummary: "Cooling confirmed.",
+            status: "disputed" as const,
+          },
+          { ...base, cityId: otherCity.id, evidenceSummary: "Cooling confirmed." },
+        ])
+        .returning();
+      fixtureIds.push(...fixtures.map((listing) => listing.id));
+      const visibleIds = (await getPublicListings()).map((listing) => listing.id);
+      expect(visibleIds).toContain(fixtures[1].id);
+      for (const index of [0, 2, 3]) {
+        expect(visibleIds).not.toContain(fixtures[index].id);
+        await expect(getListingDetail(fixtures[index].id)).resolves.toBeNull();
+      }
+      await expect(getListingDetail(fixtures[1].id)).resolves.toMatchObject({
+        id: fixtures[1].id,
+      });
+      await db
+        .update(cities)
+        .set({ isActive: true })
+        .where(eq(cities.id, otherCity.id));
+      await expect(getListingDetail(fixtures[3].id)).resolves.toBeNull();
+    } finally {
+      for (const id of fixtureIds) await db.delete(listings).where(eq(listings.id, id));
+      await db.delete(cities).where(eq(cities.id, otherCity.id));
+    }
+  }, 30_000);
+
   it("uses the real database for health, listing, contribution, and rollback paths", async () => {
-    const [{ db, sql: postgresClient }, { cities, listings, userContributions }, { eq }, { sql }, { submitAnonymousContribution }] =
-      await Promise.all([
-        import("@/db/client"),
-        import("@/db/schema"),
-        import("drizzle-orm"),
-        import("drizzle-orm"),
-        import("@/lib/contributions/contributionService"),
-      ]);
+    const [
+      { db, sql: postgresClient },
+      { cities, listings, userContributions },
+      { eq },
+      { sql },
+      { submitAnonymousContribution },
+    ] = await Promise.all([
+      import("@/db/client"),
+      import("@/db/schema"),
+      import("drizzle-orm"),
+      import("drizzle-orm"),
+      import("@/lib/contributions/contributionService"),
+    ]);
     closeDatabase = () => postgresClient.end({ timeout: 5 });
 
     await db.execute(sql`select 1`);

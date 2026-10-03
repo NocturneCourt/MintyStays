@@ -1,15 +1,17 @@
 import type { NewListing, NewUserContribution } from "./schema";
 
-export function validateListingInvariant(listing: Pick<
-  NewListing,
-  | "guestSignalScore"
-  | "guestSignalStatus"
-  | "guestSignalConfidence"
-  | "editorScore"
-  | "editorVerifiedAt"
-  | "evidenceSummary"
-  | "isHandpicked"
->) {
+export function validateListingInvariant(
+  listing: Pick<
+    NewListing,
+    | "guestSignalScore"
+    | "guestSignalStatus"
+    | "guestSignalConfidence"
+    | "editorScore"
+    | "editorVerifiedAt"
+    | "evidenceSummary"
+    | "isHandpicked"
+  >,
+) {
   if (listing.guestSignalStatus === "unverified" && listing.guestSignalScore != null) {
     throw new Error("Unverified listings must not have a Guest Signal number");
   }
@@ -36,6 +38,10 @@ export function validateListingInvariant(listing: Pick<
     throw new Error("Editor Verified listings require an Editor Score");
   }
 
+  if (listing.editorScore && !listing.editorVerifiedAt) {
+    throw new Error("Editor Score requires an Editor Verified timestamp");
+  }
+
   const hasEvidence = Boolean(listing.evidenceSummary?.trim());
   const hasEditorialStatus = Boolean(listing.isHandpicked || listing.editorVerifiedAt);
 
@@ -53,5 +59,13 @@ export function validateContributionInvariant(
 
   if (contribution.contributorType === "insider" && !contribution.userId) {
     throw new Error("Insider contributions require a user id");
+  }
+
+  if (contribution.contributorType === "insider" && contribution.sessionId) {
+    throw new Error("Insider contributions must not carry an anonymous session id");
+  }
+
+  if (contribution.contributorType === "anonymous" && contribution.userId) {
+    throw new Error("Anonymous contributions must not carry a user id");
   }
 }

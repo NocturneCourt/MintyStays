@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { BadgeCheck } from "lucide-react";
-import maplibregl, { type Map } from "maplibre-gl";
+import { Map, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import {
   coldIndex,
   coldIndexForEditorScore,
@@ -17,34 +17,75 @@ export function ListingMap({
   selectedId,
   onSelect,
   styleUrl,
+  darkStyleUrl,
 }: {
   city: PublicCity;
   listings: PublicListing[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   styleUrl: string;
+  darkStyleUrl: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const [positions, setPositions] = useState<Record<string, PinPosition>>({});
+  const [mapError, setMapError] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    mapRef.current = new maplibregl.Map({
-      container: containerRef.current,
-      style: styleUrl,
-      center: [city.lng, city.lat],
-      zoom: 12,
-      attributionControl: false,
-    });
-    mapRef.current.addControl(new maplibregl.NavigationControl(), "top-right");
+    const initialTheme = document.documentElement.dataset.theme === "dark";
+    setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+    setMapError(false);
+    try {
+      mapRef.current = new Map({
+        container: containerRef.current,
+        style: initialTheme ? darkStyleUrl : styleUrl,
+        center: [city.lng, city.lat],
+        zoom: 12,
+      });
+    } catch {
+      const frame = window.requestAnimationFrame(() => setMapError(true));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    const map = mapRef.current;
+    map.addControl(new NavigationControl(), "top-right");
+    const handleMapError = () => setMapError(true);
+    const handleMapLoad = () => setMapReady(true);
+    map.on("error", handleMapError);
+    map.on("load", handleMapLoad);
 
     return () => {
-      mapRef.current?.remove();
+      map.off("error", handleMapError);
+      map.off("load", handleMapLoad);
+      map.remove();
       mapRef.current = null;
     };
-  }, [city.lat, city.lng, styleUrl]);
+  }, [city.lat, city.lng, darkStyleUrl, styleUrl]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    let activeTheme =
+      document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    const syncMapTheme = () => {
+      const nextTheme =
+        document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+      if (nextTheme === activeTheme) return;
+      activeTheme = nextTheme;
+      setMapError(false);
+      map.setStyle(nextTheme === "dark" ? darkStyleUrl : styleUrl);
+    };
+    const observer = new MutationObserver(syncMapTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
+    return () => observer.disconnect();
+  }, [darkStyleUrl, styleUrl]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -54,32 +95,20 @@ export function ListingMap({
     const syncPinPositions = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        setPositions(
-          Object.fromEntries(
-            listings.map((listing) => {
-              const point = map.project([listing.lng, listing.lat]);
-
-              return [
-                listing.id,
-                {
-                  left: point.x,
-                  top: point.y,
-                },
-              ];
-            }),
-          ),
-        );
+        setPositions(getDeconflictedPositions(listings, map));
       });
     };
 
     syncPinPositions();
     map.on("load", syncPinPositions);
+    map.on("styledata", syncPinPositions);
     map.on("move", syncPinPositions);
     map.on("resize", syncPinPositions);
 
     return () => {
       window.cancelAnimationFrame(frame);
       map.off("load", syncPinPositions);
+      map.off("styledata", syncPinPositions);
       map.off("move", syncPinPositions);
       map.off("resize", syncPinPositions);
     };
@@ -111,7 +140,17 @@ export function ListingMap({
 
   return (
     <>
-      <div ref={containerRef} className="map-canvas" aria-label="Listings map" />
+      <div
+        ref={containerRef}
+        className="map-canvas"
+        aria-label="Listings map"
+        data-map-ready={mapReady}
+      />
+      {mapError ? (
+        <div className="map-error" role="status">
+          Map unavailable. Browse and select stays in the list.
+        </div>
+      ) : null}
       <div className="static-pin-layer" aria-label="Map pins">
         {listings.map((listing) => {
           const position = positions[listing.id];
@@ -138,7 +177,7 @@ export function ListingMap({
                 ...positionStyle,
                 ...pin.style,
               }}
-              aria-label={`Select ${listing.name}`}
+              aria-label={getPinAriaLabel(listing, pin.kind)}
               onClick={() => onSelect(listing.id)}
             >
               {pin.kind === "guest" ? (
@@ -159,10 +198,103 @@ export function ListingMap({
   );
 }
 
+function getPinAriaLabel(listing: PublicListing, kind: PinPresentation["kind"]) {
+  if (kind === "guest" && listing.guestSignalScore != null) {
+    return `Select ${listing.name}; Guest Signal ${listing.guestSignalScore} out of 100`;
+  }
+
+  if (kind === "editor" && listing.editorScore) {
+    return `Select ${listing.name}; Editor Score ${formatEditorPinScore(listing.editorScore)}`;
+  }
+
+  return `Select ${listing.name}; Guest Signal unverified`;
+}
+
+function formatEditorPinScore(score: NonNullable<PublicListing["editorScore"]>) {
+  return score.replace("verified_", "").replace("_", " ");
+}
+
 type PinPosition = {
   left: number;
   top: number;
 };
+
+function getDeconflictedPositions(
+  listings: PublicListing[],
+  map: Map,
+): Record<string, PinPosition> {
+  const placed: Array<{ left: number; top: number }> = [];
+  const positions: Record<string, PinPosition> = {};
+  const { clientWidth: width, clientHeight: height } = map.getContainer();
+  const safeAreas = [
+    // Map console and navigation controls occupy the top corners.
+    { left: 0, top: 0, right: 360, bottom: 142 },
+    { left: Math.max(0, width - 78), top: 0, right: width, bottom: 124 },
+    // Keep the Cold Index legend and attribution readable at the bottom.
+    {
+      left: Math.max(0, (width - 470) / 2),
+      top: Math.max(0, height - 122),
+      right: Math.min(width, (width + 470) / 2),
+      bottom: height,
+    },
+  ];
+
+  for (const listing of listings) {
+    const point = map.project([listing.lng, listing.lat]);
+    const offset = findPinOffset(point.x, point.y, placed, safeAreas);
+    const position = {
+      left: point.x + offset.left,
+      top: point.y + offset.top,
+    };
+    positions[listing.id] = position;
+    placed.push(position);
+  }
+
+  return positions;
+}
+
+function findPinOffset(
+  left: number,
+  top: number,
+  placed: Array<{ left: number; top: number }>,
+  safeAreas: Array<{ left: number; top: number; right: number; bottom: number }>,
+) {
+  const minimumDistance = 42;
+  const candidates = [{ left: 0, top: 0 }];
+
+  for (let radius = 24; radius <= 96; radius += 24) {
+    for (let step = 0; step < 8; step += 1) {
+      const angle = (step / 8) * Math.PI * 2;
+      candidates.push({
+        left: Math.round(Math.cos(angle) * radius),
+        top: Math.round(Math.sin(angle) * radius),
+      });
+    }
+  }
+
+  return (
+    candidates.find(
+      (candidate) =>
+        placed.every((position) => {
+          const dx = left + candidate.left - position.left;
+          const dy = top + candidate.top - position.top;
+          return Math.hypot(dx, dy) >= minimumDistance;
+        }) &&
+        safeAreas.every((area) => {
+          const pinLeft = left + candidate.left - 25;
+          const pinRight = left + candidate.left + 25;
+          const pinTop = top + candidate.top - 20;
+          const pinBottom = top + candidate.top + 20;
+          return (
+            pinRight < area.left ||
+            pinLeft > area.right ||
+            pinBottom < area.top ||
+            pinTop > area.bottom
+          );
+        }),
+    ) ?? candidates[candidates.length - 1]
+  );
+}
 
 type PinPresentation =
   | {
@@ -197,10 +329,7 @@ function getPinPresentation(listing: PublicListing): PinPresentation {
   };
 }
 
-function createPin(
-  kind: "guest" | "editor",
-  index: ColdIndexResult,
-): PinPresentation {
+function createPin(kind: "guest" | "editor", index: ColdIndexResult): PinPresentation {
   return {
     kind,
     className: `is-${kind} band-${index.band}`,

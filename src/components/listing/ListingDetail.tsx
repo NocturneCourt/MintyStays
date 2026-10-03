@@ -13,6 +13,7 @@ import { InsiderReportForm } from "./InsiderReportForm";
 import { ScoreRows } from "./ScoreRows";
 import { SignalsConflictNotice } from "./SignalsConflictNotice";
 import { TrustBadge } from "./TrustBadge";
+import { ListingImage } from "./ListingImage";
 
 type ListingDetailAuthState =
   | { enabled: false }
@@ -30,7 +31,7 @@ export function ListingDetail({
   authState?: ListingDetailAuthState;
 }) {
   return (
-    <main className="detail-shell">
+    <main id="main-content" className="detail-shell">
       <article className="detail-main">
         <Link className="detail-back" href="/">
           <ArrowLeft size={16} aria-hidden="true" />
@@ -38,6 +39,7 @@ export function ListingDetail({
         </Link>
         <div className="detail-hero">
           <div className="detail-intro">
+            <ListingImage listing={listing} variant="hero" priority />
             <TrustBadge tier={listing.trustTier} />
             <span className="eyebrow">Evidence snapshot</span>
             <h1>{listing.name}</h1>
@@ -115,6 +117,25 @@ export function ListingDetail({
         <section className="detail-panel contribution-panel">
           <AnonymousContributionForm listingId={listing.id} />
         </section>
+        {listing.photoGallery?.length ? (
+          <section className="detail-panel detail-gallery" aria-label="Listing photos">
+            <div>
+              <span className="eyebrow">Photo gallery</span>
+              <h2>More of the stay</h2>
+            </div>
+            <div className="detail-gallery-grid">
+              {listing.photoGallery.map((photo) => (
+                <ListingImage
+                  key={photo.url}
+                  listing={listing}
+                  variant="gallery"
+                  imageUrl={photo.url}
+                  attribution={photo.attribution}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
         {authState.enabled ? (
           <section className="member-controls">
             {authState.canAccessInsider ? (

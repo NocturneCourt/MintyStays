@@ -48,7 +48,7 @@ export default async function AdminListingPage({ params }: AdminListingPageProps
   }
 
   return (
-    <main className="detail-shell">
+    <main id="main-content" className="detail-shell">
       <EditorListingControls listing={listing} />
     </main>
   );

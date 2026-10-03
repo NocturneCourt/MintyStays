@@ -46,6 +46,13 @@ export async function updateEditorialListing(
   db: DbClient,
   input: EditorialUpdateInput,
 ): Promise<EditorialUpdateResult> {
+  return db.transaction(async (tx) => updateLockedEditorialListing(tx, input));
+}
+
+async function updateLockedEditorialListing(
+  db: Parameters<Parameters<DbClient["transaction"]>[0]>[0],
+  input: EditorialUpdateInput,
+): Promise<EditorialUpdateResult> {
   const [current] = await db
     .select({
       id: listings.id,
@@ -58,7 +65,8 @@ export async function updateEditorialListing(
     })
     .from(listings)
     .where(eq(listings.id, input.listingId))
-    .limit(1);
+    .limit(1)
+    .for("update");
 
   if (!current) {
     throw new EditorialListingNotFoundError(input.listingId);
@@ -75,7 +83,7 @@ export async function updateEditorialListing(
     input.editorVerified === false
       ? null
       : "editorScore" in input
-        ? input.editorScore ?? null
+        ? (input.editorScore ?? null)
         : current.editorScore;
   const nextReviewNeeded = input.reviewNeeded ?? current.reviewNeeded;
 
@@ -86,9 +94,7 @@ export async function updateEditorialListing(
   }
 
   if (nextEditorScore && !nextEditorVerifiedAt) {
-    throw new EditorialInvariantError(
-      "Editor Score requires Editor Verified status",
-    );
+    throw new EditorialInvariantError("Editor Score requires Editor Verified status");
   }
 
   const trustTier = deriveTrustTier({

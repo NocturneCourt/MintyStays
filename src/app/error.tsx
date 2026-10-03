@@ -14,7 +14,7 @@ export default function GlobalErrorBoundary({
   }, [error]);
 
   return (
-    <main className="error-shell">
+    <main id="main-content" className="error-shell">
       <section className="error-card" role="alert">
         <p className="eyebrow">Cooling data unavailable</p>
         <h1>We could not load this page.</h1>

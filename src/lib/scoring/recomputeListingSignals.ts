@@ -23,11 +23,43 @@ type ReviewSignalRow = {
 };
 
 export async function recomputeListingSignals(
-  db: DbClient,
+  db: SignalDatabase,
   listingId: string,
   now = new Date(),
   extractionVersion = getCoolingExtractionVersion(),
 ) {
+  return db.transaction(async (tx) =>
+    recomputeLockedListingSignals(tx, listingId, now, extractionVersion),
+  );
+}
+
+export type SignalDatabase =
+  | DbClient
+  | Parameters<Parameters<DbClient["transaction"]>[0]>[0];
+
+async function recomputeLockedListingSignals(
+  db: SignalDatabase,
+  listingId: string,
+  now: Date,
+  extractionVersion: string,
+) {
+  const [listing] = await db
+    .select({
+      isHandpicked: listings.isHandpicked,
+      editorScore: listings.editorScore,
+      editorVerifiedAt: listings.editorVerifiedAt,
+      cityLat: cities.lat,
+    })
+    .from(listings)
+    .innerJoin(cities, eq(listings.cityId, cities.id))
+    .where(eq(listings.id, listingId))
+    .limit(1)
+    .for("update", { of: listings });
+
+  if (!listing) {
+    throw new Error(`Listing not found for recompute: ${listingId}`);
+  }
+
   const extractedRows = await db
     .select({
       source: rawReviews.source,
@@ -58,21 +90,6 @@ export async function recomputeListingSignals(
         inArray(reviewSignals.source, ["anonymous", "insider"]),
       ),
     );
-  const [listing] = await db
-    .select({
-      isHandpicked: listings.isHandpicked,
-      editorScore: listings.editorScore,
-      editorVerifiedAt: listings.editorVerifiedAt,
-      cityLat: cities.lat,
-    })
-    .from(listings)
-    .innerJoin(cities, eq(listings.cityId, cities.id))
-    .where(eq(listings.id, listingId))
-    .limit(1);
-
-  if (!listing) {
-    throw new Error(`Listing not found for recompute: ${listingId}`);
-  }
 
   const guestSignal = calculateGuestSignal(
     [...extractedRows, ...contributionRows].flatMap((row) => toGuestSignalInput(row)),

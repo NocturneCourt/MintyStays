@@ -42,7 +42,7 @@ describe("GET /api/health", () => {
     expect(response.status).toBe(503);
     expect(body.ok).toBe(false);
     expect(body.database.ok).toBe(false);
-    expect(body.database.error).toMatch(/connection refused/i);
+    expect(body.database.error).toBe("Database probe failed");
   });
 
   it("returns 503 in production when DATABASE_URL is missing", async () => {

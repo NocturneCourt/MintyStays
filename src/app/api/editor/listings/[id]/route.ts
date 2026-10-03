@@ -16,12 +16,7 @@ const editorialUpdateSchema = z
     isHandpicked: z.boolean().optional(),
     editorVerified: z.boolean().optional(),
     editorScore: z
-      .enum([
-        "verified_cold",
-        "verified_adequate",
-        "verified_weak",
-        "verified_broken",
-      ])
+      .enum(["verified_cold", "verified_adequate", "verified_weak", "verified_broken"])
       .nullable()
       .optional(),
     reviewNeeded: z.boolean().optional(),
@@ -32,10 +27,7 @@ type EditorListingRouteContext = {
   params: Promise<{ id: string }>;
 };
 
-export async function PATCH(
-  request: NextRequest,
-  context: EditorListingRouteContext,
-) {
+export async function PATCH(request: NextRequest, context: EditorListingRouteContext) {
   if (!isAuthEnabled()) {
     return NextResponse.json({ error: "Auth is not enabled" }, { status: 404 });
   }
@@ -45,25 +37,22 @@ export async function PATCH(
   );
 
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid editorial payload" },
-      { status: 400 },
-    );
-  }
-
-  const authOptions = await buildAuthOptions();
-  const session = await getServerSession(authOptions);
-
-  if (!canAccessEditor(session?.user)) {
-    return NextResponse.json(
-      { error: "Editor access is required" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "Invalid editorial payload" }, { status: 400 });
   }
 
   const { id } = await context.params;
+  if (!z.string().uuid().safeParse(id).success) {
+    return NextResponse.json({ error: "Invalid listing id" }, { status: 400 });
+  }
 
   try {
+    const authOptions = await buildAuthOptions();
+    const session = await getServerSession(authOptions);
+
+    if (!canAccessEditor(session?.user)) {
+      return NextResponse.json({ error: "Editor access is required" }, { status: 403 });
+    }
+
     const { db } = await import("@/db/client");
     const listing = await updateEditorialListing(db, {
       listingId: id,

@@ -10,11 +10,7 @@ type SubmissionState =
   | { kind: "duplicate"; message: string }
   | { kind: "error"; message: string };
 
-export function InsiderReportForm({
-  listingId,
-}: {
-  listingId: PublicListing["id"];
-}) {
+export function InsiderReportForm({ listingId }: { listingId: PublicListing["id"] }) {
   const [vote, setVote] = useState("confirm_cold");
   const [comment, setComment] = useState("");
   const [state, setState] = useState<SubmissionState>({
@@ -26,42 +22,50 @@ export function InsiderReportForm({
     event.preventDefault();
     setState({ kind: "submitting", message: "Saving Insider report..." });
 
-    const response = await fetch("/api/insider/reports", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        listingId,
-        vote,
-        comment: comment.trim() || undefined,
-      }),
-    });
-
-    if (response.status === 409) {
-      setState({
-        kind: "duplicate",
-        message: "You already sent an Insider report for this listing.",
+    try {
+      const response = await fetch("/api/insider/reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          listingId,
+          vote,
+          comment: comment.trim() || undefined,
+        }),
       });
-      return;
-    }
 
-    if (!response.ok) {
+      if (response.status === 409) {
+        setState({
+          kind: "duplicate",
+          message: "You already sent an Insider report for this listing.",
+        });
+        return;
+      }
+
+      if (!response.ok) {
+        setState({
+          kind: "error",
+          message: "Could not save that Insider report.",
+        });
+        return;
+      }
+
+      setState({
+        kind: "success",
+        message:
+          vote === "confirm_cold"
+            ? "Insider cold-room confirmation recorded."
+            : "Insider dispute recorded for cooling review.",
+      });
+      setComment("");
+    } catch {
       setState({
         kind: "error",
-        message: "Could not save that Insider report.",
+        message:
+          "Could not save that Insider report. Check your connection and try again.",
       });
-      return;
     }
-
-    setState({
-      kind: "success",
-      message:
-        vote === "confirm_cold"
-          ? "Insider cold-room confirmation recorded."
-          : "Insider dispute recorded for cooling review.",
-    });
-    setComment("");
   }
 
   return (
@@ -69,8 +73,8 @@ export function InsiderReportForm({
       <div>
         <h2>Insider report</h2>
         <p className="score-note">
-          Signed-in Insider reports affect Guest Signal with higher weight and
-          remain attributable.
+          Signed-in Insider reports affect Guest Signal with higher weight and remain
+          attributable.
         </p>
       </div>
       <fieldset>

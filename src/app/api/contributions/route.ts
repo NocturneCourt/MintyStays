@@ -15,7 +15,7 @@ import { isServiceUnavailableError } from "@/lib/http/errors";
 import { getListingDetail } from "@/lib/listings/getListingDetail";
 
 const contributionSchema = z.object({
-  listingId: z.string().min(1),
+  listingId: z.string().min(1).max(160),
   vote: z.enum(["confirm_cold", "dispute_weak", "broken"]),
   comment: z.string().max(1000).optional(),
 });

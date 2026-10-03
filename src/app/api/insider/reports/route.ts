@@ -10,7 +10,7 @@ import { submitInsiderReport } from "@/lib/contributions/insiderReportService";
 import { isServiceUnavailableError } from "@/lib/http/errors";
 
 const insiderReportSchema = z.object({
-  listingId: z.string().min(1),
+  listingId: z.string().uuid(),
   vote: z.enum(["confirm_cold", "dispute_weak", "broken"]),
   comment: z.string().max(1000).optional(),
 });
@@ -20,26 +20,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Auth is not enabled" }, { status: 404 });
   }
 
-  const parsed = insiderReportSchema.safeParse(
-    await request.json().catch(() => null),
-  );
+  const parsed = insiderReportSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid report payload" }, { status: 400 });
   }
 
-  const authOptions = await buildAuthOptions();
-  const session = await getServerSession(authOptions);
-  const principal = toAuthPrincipal(session?.user);
-
-  if (principal.kind === "anonymous") {
-    return NextResponse.json(
-      { error: "Insider access is required" },
-      { status: 401 },
-    );
-  }
-
   try {
+    const authOptions = await buildAuthOptions();
+    const session = await getServerSession(authOptions);
+    const principal = toAuthPrincipal(session?.user);
+
+    if (principal.kind === "anonymous") {
+      return NextResponse.json(
+        { error: "Insider access is required" },
+        { status: 401 },
+      );
+    }
+
     const { db } = await import("@/db/client");
     const [listing] = await db
       .select({ id: listings.id })

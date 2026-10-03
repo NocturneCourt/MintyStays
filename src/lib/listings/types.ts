@@ -25,6 +25,9 @@ export type PublicListing = {
   source: string;
   sourceUrl?: string;
   affiliateUrl?: string;
+  imageUrl?: string;
+  imageAttribution?: string;
+  photoGallery?: Array<{ url: string; attribution?: string }>;
   acType?: AcType;
   guestSignalScore: number | null;
   guestSignalStatus: "unverified" | "scored";

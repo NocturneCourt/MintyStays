@@ -5,6 +5,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -58,6 +59,11 @@ export const editorScoreEnum = pgEnum("editor_score", [
   "verified_broken",
 ]);
 
+export type PhotoGalleryItem = {
+  url: string;
+  attribution?: string;
+};
+
 export const cities = pgTable(
   "cities",
   {
@@ -74,6 +80,14 @@ export const cities = pgTable(
   (table) => ({
     slugIdx: uniqueIndex("cities_slug_idx").on(table.slug),
     activeIdx: index("cities_is_active_idx").on(table.isActive),
+    latitudeRangeCheck: check(
+      "cities_latitude_range_check",
+      sql`${table.lat} BETWEEN -90 AND 90`,
+    ),
+    longitudeRangeCheck: check(
+      "cities_longitude_range_check",
+      sql`${table.lng} BETWEEN -180 AND 180`,
+    ),
   }),
 );
 
@@ -110,6 +124,9 @@ export const listings = pgTable(
     source: text("source").notNull(),
     sourceUrl: text("source_url"),
     affiliateUrl: text("affiliate_url"),
+    imageUrl: text("image_url"),
+    imageAttribution: text("image_attribution"),
+    photoGallery: jsonb("photo_gallery").$type<PhotoGalleryItem[]>(),
     acType: acTypeEnum("ac_type"),
     guestSignalScore: integer("guest_signal_score"),
     guestSignalStatus: guestSignalStatusEnum("guest_signal_status")
@@ -156,7 +173,19 @@ export const listings = pgTable(
     ),
     editorVerificationCheck: check(
       "listings_editor_verification_check",
-      sql`${table.editorScore} IS NULL OR ${table.editorVerifiedAt} IS NOT NULL`,
+      sql`(${table.editorScore} IS NULL) = (${table.editorVerifiedAt} IS NULL)`,
+    ),
+    latitudeRangeCheck: check(
+      "listings_latitude_range_check",
+      sql`${table.lat} BETWEEN -90 AND 90`,
+    ),
+    longitudeRangeCheck: check(
+      "listings_longitude_range_check",
+      sql`${table.lng} BETWEEN -180 AND 180`,
+    ),
+    reviewCountCheck: check(
+      "listings_review_count_check",
+      sql`${table.reviewCountAnalyzed} >= 0`,
     ),
   }),
 );
@@ -289,6 +318,9 @@ export const userContributions = pgTable(
       table.listingId,
       table.sessionId,
     ),
+    insiderOnceIdx: uniqueIndex("user_contributions_listing_user_idx")
+      .on(table.listingId, table.userId)
+      .where(sql`${table.contributorType} = 'insider'`),
     contributorIdentityCheck: check(
       "user_contributions_identity_check",
       sql`(
@@ -298,6 +330,7 @@ export const userContributions = pgTable(
       ) OR (
         ${table.contributorType} = 'insider'
         AND ${table.userId} IS NOT NULL
+        AND ${table.sessionId} IS NULL
       )`,
     ),
   }),

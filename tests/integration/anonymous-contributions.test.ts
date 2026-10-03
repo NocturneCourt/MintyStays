@@ -20,6 +20,7 @@ type TestState = {
 };
 
 type TestTransaction = {
+  select: () => unknown;
   insert: (table: unknown) => {
     values: (row: StoredRow) => Promise<void>;
   };
@@ -144,7 +145,7 @@ describe("anonymous contribution integration", () => {
     };
     const recompute = {
       async recomputeListingSignals(
-        _db: DbClient,
+        _db: import("@/lib/scoring/recomputeListingSignals").SignalDatabase,
         listingId: string,
         recomputeAt: Date = now,
       ) {
@@ -153,7 +154,9 @@ describe("anonymous contribution integration", () => {
       },
     };
 
-    await expect(submitAnonymousContribution(db, input, recompute)).resolves.toMatchObject({
+    await expect(
+      submitAnonymousContribution(db, input, recompute),
+    ).resolves.toMatchObject({
       status: "created",
       listingStatus: "active",
       reviewNeeded: false,
@@ -214,6 +217,7 @@ function createContributionTestDb(options?: { seedContributions?: StoredRow[] })
   };
 
   const transaction: TestTransaction = {
+    select,
     insert(table) {
       return {
         async values(row) {
@@ -253,12 +257,11 @@ function createContributionTestDb(options?: { seedContributions?: StoredRow[] })
   // Select is used for (1) session duplicate check with .limit() and
   // (2) IP rate-limit count when the chain is awaited without .limit().
   function select() {
-    const withSession = () => state.contributions.filter((row) => Boolean(row.sessionId));
+    const withSession = () =>
+      state.contributions.filter((row) => Boolean(row.sessionId));
     const disputeRows = () =>
       state.contributions.filter(
-        (row) =>
-          row.clientIp &&
-          (row.vote === "dispute_weak" || row.vote === "broken"),
+        (row) => row.clientIp && (row.vote === "dispute_weak" || row.vote === "broken"),
       );
 
     const query = {
@@ -267,6 +270,9 @@ function createContributionTestDb(options?: { seedContributions?: StoredRow[] })
       },
       where() {
         return query;
+      },
+      for() {
+        return Promise.resolve([]);
       },
       async limit() {
         const rows = withSession();

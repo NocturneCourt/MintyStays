@@ -12,16 +12,21 @@ export function MapExplorer({
   listings,
   filters,
   styleUrl,
+  darkStyleUrl,
 }: {
   city: PublicCity;
   listings: PublicListing[];
   filters: ListingFilters;
   styleUrl: string;
+  darkStyleUrl: string;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(listings[0]?.id ?? null);
   const handleSelect = useCallback((id: string) => setSelectedId(id), []);
+  const visibleSelectedId = listings.some((listing) => listing.id === selectedId)
+    ? selectedId
+    : (listings[0]?.id ?? null);
   const selectedListing =
-    listings.find((listing) => listing.id === selectedId) ?? listings[0] ?? null;
+    listings.find((listing) => listing.id === visibleSelectedId) ?? null;
   const scoredCount = listings.filter(
     (listing) => listing.guestSignalStatus === "scored",
   ).length;
@@ -45,9 +50,10 @@ export function MapExplorer({
           <ListingMap
             city={city}
             listings={listings}
-            selectedId={selectedId}
+            selectedId={visibleSelectedId}
             onSelect={handleSelect}
             styleUrl={styleUrl}
+            darkStyleUrl={darkStyleUrl}
           />
         ) : (
           <div className="map-empty">
@@ -94,7 +100,7 @@ export function MapExplorer({
         </div>
         <ListingList
           listings={listings}
-          selectedId={selectedId}
+          selectedId={visibleSelectedId}
           onSelect={handleSelect}
         />
       </aside>

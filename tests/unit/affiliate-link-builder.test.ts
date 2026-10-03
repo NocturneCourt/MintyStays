@@ -1,11 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AffiliateUrlNotAllowedError,
   buildAffiliateLink,
   isAllowedAffiliateUrl,
 } from "@/lib/affiliate/AffiliateLinkBuilder";
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("buildAffiliateLink", () => {
+  it("rejects local redirects in production and credential-bearing destinations", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(isAllowedAffiliateUrl("http://localhost:3000/hotel")).toBe(false);
+    expect(isAllowedAffiliateUrl("https://127.0.0.1/hotel")).toBe(false);
+    expect(isAllowedAffiliateUrl("https://user:pass@www.booking.com/hotel")).toBe(
+      false,
+    );
+    expect(isAllowedAffiliateUrl("https://www.booking.com/hotel")).toBe(true);
+  });
   it("builds Booking.com-style tracked links", () => {
     const url = new URL(
       buildAffiliateLink({
@@ -23,9 +34,7 @@ describe("buildAffiliateLink", () => {
   });
 
   it("allows airbnb, trivago, and localhost for development", () => {
-    expect(
-      isAllowedAffiliateUrl("https://www.airbnb.com/rooms/123"),
-    ).toBe(true);
+    expect(isAllowedAffiliateUrl("https://www.airbnb.com/rooms/123")).toBe(true);
     expect(
       isAllowedAffiliateUrl("https://www.trivago.com/en-US/lm/hotels-lisbon"),
     ).toBe(true);

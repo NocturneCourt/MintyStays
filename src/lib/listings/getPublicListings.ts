@@ -1,7 +1,4 @@
-import {
-  ServiceUnavailableError,
-  shouldFailClosedOnDbError,
-} from "@/lib/http/errors";
+import { ServiceUnavailableError, shouldFailClosedOnDbError } from "@/lib/http/errors";
 import type { ListingFilters } from "./listingFilters";
 import { mapDbListingToPublicListing } from "./mapDbListing";
 import { getSeedListings } from "./seedData";
@@ -9,30 +6,59 @@ import type { PublicListing } from "./types";
 
 export async function getPublicListings(filters: ListingFilters = {}) {
   const listings = await loadListings(filters);
-  return listings.filter((listing) => {
-    if (!listing.evidenceSummary && listing.trustTier === "unverified") {
-      return false;
-    }
+  return listings
+    .filter((listing) => {
+      if (
+        !listing.evidenceSummary.trim() &&
+        listing.reviewCountAnalyzed === 0 &&
+        listing.trustTier === "unverified"
+      ) {
+        return false;
+      }
 
-    if (filters.type && listing.type !== filters.type) {
-      return false;
-    }
+      if (filters.type && listing.type !== filters.type) {
+        return false;
+      }
 
-    if (filters.trustTier && listing.trustTier !== filters.trustTier) {
-      return false;
-    }
+      if (filters.trustTier && listing.trustTier !== filters.trustTier) {
+        return false;
+      }
 
-    if (filters.bounds && !isInsideBounds(listing, filters.bounds)) {
-      return false;
-    }
+      if (filters.bounds && !isInsideBounds(listing, filters.bounds)) {
+        return false;
+      }
 
-    if (filters.minScore != null) {
-      if (listing.guestSignalScore == null) return false;
-      return listing.guestSignalScore >= filters.minScore;
-    }
+      if (filters.minScore != null) {
+        if (listing.guestSignalScore == null) return false;
+        return listing.guestSignalScore >= filters.minScore;
+      }
 
-    return true;
-  });
+      return true;
+    })
+    .sort(comparePublicListings);
+}
+
+function comparePublicListings(a: PublicListing, b: PublicListing) {
+  const scoreDifference = (b.guestSignalScore ?? -1) - (a.guestSignalScore ?? -1);
+  if (scoreDifference) return scoreDifference;
+
+  const trustDifference = trustRank(b.trustTier) - trustRank(a.trustTier);
+  if (trustDifference) return trustDifference;
+
+  return a.name.localeCompare(b.name);
+}
+
+function trustRank(tier: PublicListing["trustTier"]) {
+  switch (tier) {
+    case "editor_verified":
+      return 4;
+    case "handpicked":
+      return 3;
+    case "scored":
+      return 2;
+    case "unverified":
+      return 1;
+  }
 }
 
 async function loadListings(filters: ListingFilters): Promise<PublicListing[]> {
@@ -40,28 +66,23 @@ async function loadListings(filters: ListingFilters): Promise<PublicListing[]> {
 
   if (!process.env.DATABASE_URL) {
     if (shouldFailClosedOnDbError()) {
-      throw new ServiceUnavailableError(
-        "DATABASE_URL is required in production",
-      );
+      throw new ServiceUnavailableError("DATABASE_URL is required in production");
     }
     return getSeedListings();
   }
 
   try {
-    const [
-      { db },
-      { cities, listings },
-      { and, eq, gte, lte, ne, or, sql },
-    ] = await Promise.all([
-      import("@/db/client"),
-      import("@/db/schema"),
-      import("drizzle-orm"),
-    ]);
+    const [{ db }, { cities, listings }, { and, eq, gte, lte, ne, or, sql }] =
+      await Promise.all([
+        import("@/db/client"),
+        import("@/db/schema"),
+        import("drizzle-orm"),
+      ]);
 
     const [city] = await db
       .select({ id: cities.id, lat: cities.lat, lng: cities.lng })
       .from(cities)
-      .where(eq(cities.slug, launchCitySlug))
+      .where(and(eq(cities.slug, launchCitySlug), eq(cities.isActive, true)))
       .limit(1);
 
     if (!city) {
@@ -78,6 +99,7 @@ async function loadListings(filters: ListingFilters): Promise<PublicListing[]> {
       lte(listings.lng, bounds.maxLng),
       or(
         sql`${listings.evidenceSummary} IS NOT NULL AND btrim(${listings.evidenceSummary}) <> ''`,
+        sql`${listings.reviewCountAnalyzed} > 0`,
         ne(listings.trustTier, "unverified"),
       ),
     ];
@@ -106,9 +128,7 @@ async function loadListings(filters: ListingFilters): Promise<PublicListing[]> {
     }
 
     console.error("Public listings database query failed", error);
-    throw new ServiceUnavailableError(
-      "Listing data is temporarily unavailable",
-    );
+    throw new ServiceUnavailableError("Listing data is temporarily unavailable");
   }
 }
 

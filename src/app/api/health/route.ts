@@ -50,9 +50,9 @@ async function probeDatabase(databaseUrl: string | undefined): Promise<{
     await db.execute(sql`select 1`);
     return { ok: true };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Database probe failed";
     console.error("Health database probe failed", error);
-    return { ok: false, error: message };
+    // Keep connection strings, hostnames, and driver details out of a public
+    // endpoint. The full error remains available in server logs.
+    return { ok: false, error: "Database probe failed" };
   }
 }

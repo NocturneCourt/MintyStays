@@ -12,7 +12,10 @@ import {
   LISTING_NATURAL_KEY,
   toListingRow,
 } from "@/lib/sources/importListings";
-import type { ListingSourceAdapter, SeedListing } from "@/lib/sources/ListingSourceAdapter";
+import type {
+  ListingSourceAdapter,
+  SeedListing,
+} from "@/lib/sources/ListingSourceAdapter";
 
 const seedListing: SeedListing = {
   citySlug: "lisbon",
@@ -39,6 +42,39 @@ const seedListing: SeedListing = {
 };
 
 describe("importListings idempotency", () => {
+  it("retains non-cooling raw evidence without projecting it into Guest Signal", async () => {
+    const state = createImportMockDb();
+    const adapter: ListingSourceAdapter = {
+      sourceName: "manual",
+      async importCity() {
+        return [
+          {
+            ...seedListing,
+            reviewExcerpts: [
+              ...seedListing.reviewExcerpts,
+              { text: "Breakfast was excellent.", authoredAt: "2026-06-18" },
+            ],
+          },
+        ];
+      },
+    };
+    await importListingsFromSource(
+      adapter,
+      { citySlug: "lisbon" },
+      {
+        db: state.db as never,
+        recomputeListingSignals: async () => undefined,
+      },
+    );
+    expect(state.rawReviews).toHaveLength(4);
+    expect(state.coolingExtractions).toHaveLength(4);
+    expect(state.coolingExtractions[3]).toMatchObject({
+      mentionsCooling: false,
+      coolingSentiment: "neutral",
+    });
+    expect(state.reviewSignals).toHaveLength(3);
+  });
+
   it("uses (city_id, source, source_url) as the listing natural key", () => {
     expect(LISTING_NATURAL_KEY).toEqual([
       listings.cityId,
@@ -70,6 +106,25 @@ describe("importListings idempotency", () => {
     ]) {
       expect(set).not.toHaveProperty(field);
     }
+  });
+
+  it("counts only review excerpts that mention cooling", () => {
+    const row = toListingRow(
+      {
+        ...seedListing,
+        reviewExcerpts: [
+          { text: "Cold room AC worked well.", authoredAt: "2026-06-20" },
+          { text: "Breakfast was excellent.", authoredAt: "2026-06-18" },
+          { text: "Strong air conditioning.", authoredAt: "2026-06-15" },
+        ],
+      },
+      "city-1",
+      "manual",
+    );
+
+    expect(row.reviewCountAnalyzed).toBe(2);
+    expect(row.guestSignalStatus).toBe("unverified");
+    expect(row.guestSignalScore).toBeNull();
   });
 
   it("re-running import upserts listings and does not double review rows", async () => {
@@ -170,8 +225,7 @@ function createImportMockDb() {
                 const key = `${row.cityId}|${row.source}|${row.sourceUrl}`;
                 const existing = state.listings.find(
                   (listing) =>
-                    `${listing.cityId}|${listing.source}|${listing.sourceUrl}` ===
-                    key,
+                    `${listing.cityId}|${listing.source}|${listing.sourceUrl}` === key,
                 );
 
                 if (existing) {
@@ -201,8 +255,7 @@ function createImportMockDb() {
               if (table === rawReviews) {
                 const key = `${row.listingId}|${row.contentHash}`;
                 const existing = state.rawReviews.find(
-                  (review) =>
-                    `${review.listingId}|${review.contentHash}` === key,
+                  (review) => `${review.listingId}|${review.contentHash}` === key,
                 );
                 if (existing) {
                   return {
@@ -227,8 +280,7 @@ function createImportMockDb() {
                 const key = `${row.rawReviewId}|${row.extractionVersion}`;
                 const existing = state.coolingExtractions.find(
                   (extraction) =>
-                    `${extraction.rawReviewId}|${extraction.extractionVersion}` ===
-                    key,
+                    `${extraction.rawReviewId}|${extraction.extractionVersion}` === key,
                 );
                 if (!existing) {
                   state.coolingExtractions.push(row);

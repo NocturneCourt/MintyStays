@@ -132,8 +132,7 @@ export function recencyWeight(authoredAt: Date, now = new Date()) {
 
 export function seasonalityWeight(authoredAt: Date, cityLat = 0) {
   const northernMonth = authoredAt.getUTCMonth() + 1;
-  const month =
-    cityLat < 0 ? ((northernMonth - 1 + 6) % 12) + 1 : northernMonth;
+  const month = cityLat < 0 ? ((northernMonth - 1 + 6) % 12) + 1 : northernMonth;
 
   if (month >= 6 && month <= 9) return 1;
   if (month === 5 || month === 10) return 0.7;
@@ -143,7 +142,7 @@ export function seasonalityWeight(authoredAt: Date, cityLat = 0) {
 
 export function isBrokenAcMention(signal: GuestSignalInput) {
   if (signal.vote === "broken") return true;
-  if (!signal.rawExcerpt) return false;
+  if (signal.sentiment !== "negative" || !signal.rawExcerpt) return false;
   return BROKEN_AC_PATTERNS.some((pattern) => pattern.test(signal.rawExcerpt ?? ""));
 }
 
@@ -159,11 +158,7 @@ function signalWeight(signal: GuestSignalInput, now: Date, cityLat = 0) {
   );
 }
 
-function calculateBrokenPenalty(
-  signals: GuestSignalInput[],
-  now: Date,
-  cityLat = 0,
-) {
+function calculateBrokenPenalty(signals: GuestSignalInput[], now: Date, cityLat = 0) {
   const brokenWeight = signals.reduce((total, signal) => {
     if (!signal.authoredAt || !isBrokenAcMention(signal)) {
       return total;

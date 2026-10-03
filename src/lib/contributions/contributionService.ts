@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { and, eq, gte, inArray } from "drizzle-orm";
 import type { DbClient } from "@/db/client";
 import { validateContributionInvariant } from "@/db/invariants";
@@ -43,81 +44,102 @@ export async function submitAnonymousContribution(
   const now = input.now ?? new Date();
   const reviewNeeded = isDisputeVote(input.vote);
 
-  const existing = await db
-    .select({ id: userContributions.id })
-    .from(userContributions)
-    .where(
-      and(
-        eq(userContributions.listingId, input.listingId),
-        eq(userContributions.sessionId, input.sessionId),
-      ),
-    )
-    .limit(1);
-
-  if (existing.length) {
-    return {
-      status: "duplicate",
-      listingStatus: "active",
-      reviewNeeded,
-    };
-  }
-
-  if (reviewNeeded && input.clientIp) {
-    const limited = await isDisputeRateLimited(db, {
-      listingId: input.listingId,
-      clientIp: input.clientIp,
-      now,
-    });
-
-    if (limited) {
-      return {
-        status: "rate_limited",
-        listingStatus: "active",
-        reviewNeeded: true,
-      };
-    }
-  }
-
-  await db.transaction(async (tx) => {
-    await tx.insert(userContributions).values({
-      listingId: input.listingId,
-      contributorType: "anonymous",
-      sessionId: input.sessionId,
-      clientIp: input.clientIp ?? null,
-      vote: input.vote,
-      comment: input.comment,
-    });
-
-    await tx.insert(reviewSignals).values({
-      listingId: input.listingId,
-      source: "anonymous",
-      rawExcerpt: contributionToExcerpt(input),
-      coolingSentiment: contributionToSentiment(input.vote),
-      acTypeHint: undefined,
-      authoredAt: now,
-      extractedAt: now,
-    });
-
-    // Disputes flag for editor review; listing stays public (active) until an editor acts.
-    if (reviewNeeded) {
-      await tx
-        .update(listings)
-        .set({
-          reviewNeeded: true,
-          updatedAt: now,
-        })
-        .where(eq(listings.id, input.listingId));
-    }
-  });
-
   const recompute = options.recomputeListingSignals ?? recomputeListingSignals;
 
-  return {
-    status: "created",
-    listingStatus: "active",
-    reviewNeeded,
-    guestSignal: await recompute(db, input.listingId, now),
-  };
+  try {
+    return await db.transaction(async (tx): Promise<ContributionResult> => {
+      // Serialize reports for this listing before checking duplicates and limits.
+      await tx
+        .select({ id: listings.id })
+        .from(listings)
+        .where(eq(listings.id, input.listingId))
+        .for("update");
+
+      const existing = await tx
+        .select({ id: userContributions.id })
+        .from(userContributions)
+        .where(
+          and(
+            eq(userContributions.listingId, input.listingId),
+            eq(userContributions.sessionId, input.sessionId),
+          ),
+        )
+        .limit(1);
+
+      if (existing.length) {
+        return {
+          status: "duplicate",
+          listingStatus: "active",
+          reviewNeeded,
+        };
+      }
+
+      if (reviewNeeded && input.clientIp) {
+        const limited = await isDisputeRateLimited(tx, {
+          listingId: input.listingId,
+          clientIp: input.clientIp,
+          now,
+        });
+
+        if (limited) {
+          return {
+            status: "rate_limited",
+            listingStatus: "active",
+            reviewNeeded: true,
+          };
+        }
+      }
+
+      await tx.insert(userContributions).values({
+        listingId: input.listingId,
+        contributorType: "anonymous",
+        sessionId: input.sessionId,
+        clientIp: input.clientIp ?? null,
+        vote: input.vote,
+        comment: input.comment,
+        createdAt: now,
+      });
+
+      await tx.insert(reviewSignals).values({
+        listingId: input.listingId,
+        source: "anonymous",
+        rawExcerpt: contributionToExcerpt(input),
+        coolingSentiment: contributionToSentiment(input.vote),
+        acTypeHint: undefined,
+        authoredAt: now,
+        extractedAt: now,
+      });
+
+      // Disputes flag for editor review; listing stays public (active) until an editor acts.
+      if (reviewNeeded) {
+        await tx
+          .update(listings)
+          .set({
+            reviewNeeded: true,
+            updatedAt: now,
+          })
+          .where(eq(listings.id, input.listingId));
+      }
+
+      return {
+        status: "created",
+        listingStatus: "active",
+        reviewNeeded,
+        guestSignal: await recompute(tx, input.listingId, now),
+      };
+    });
+  } catch (error) {
+    // The preflight duplicate check is intentionally followed by a database
+    // uniqueness guard so simultaneous submissions resolve as duplicates.
+    if (isUniqueViolation(error)) {
+      return {
+        status: "duplicate",
+        listingStatus: "active",
+        reviewNeeded,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function isDisputeRateLimited(
@@ -163,21 +185,31 @@ export function contributionToExcerpt(input: AnonymousContributionInput) {
   return input.comment?.trim() ? `${label} ${input.comment.trim()}` : label;
 }
 
+export function isUniqueViolation(error: unknown) {
+  const seen = new Set<unknown>();
+  let current = error;
+
+  while (typeof current === "object" && current !== null && !seen.has(current)) {
+    seen.add(current);
+    if ("code" in current && current.code === "23505") return true;
+    current = "cause" in current ? current.cause : null;
+  }
+
+  return false;
+}
+
 export function getClientIpFromHeaders(
   headers: Headers,
   options: { trustForwardedFor?: boolean } = {},
 ): string | null {
-  const realIp = headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
   const trustForwardedFor =
     options.trustForwardedFor ?? process.env.TRUSTED_PROXY_HEADERS === "true";
 
   if (!trustForwardedFor) return null;
 
-  const forwarded = headers.get("x-forwarded-for");
-  if (!forwarded) return null;
+  const realIp = headers.get("x-real-ip")?.trim();
+  if (realIp && isIP(realIp)) return realIp;
 
-  const first = forwarded.split(",")[0]?.trim();
-  return first || null;
+  const first = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return first && isIP(first) ? first : null;
 }

@@ -6,6 +6,8 @@ const baseURL = externalBaseUrl ?? `http://127.0.0.1:${localPort}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testMatch: externalBaseUrl ? "deployed-smoke.spec.ts" : "**/*.spec.ts",
+  testIgnore: externalBaseUrl ? undefined : "deployed-smoke.spec.ts",
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   use: {
@@ -21,9 +23,11 @@ export default defineConfig({
   webServer: externalBaseUrl
     ? undefined
     : {
-        command: `PORT=${localPort} MAP_STYLE_URL=http://127.0.0.1:${localPort}/test-map-style.json pnpm dev`,
+        command: `PORT=${localPort} MAP_STYLE_URL=http://127.0.0.1:${localPort}/test-map-style.json MAP_STYLE_URL_DARK=http://127.0.0.1:${localPort}/test-map-style.json pnpm dev`,
         url: baseURL,
-        reuseExistingServer: !process.env.CI,
+        // Never attach to an unrelated local server by accident. Opt in when
+        // intentionally running against an already-started app.
+        reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === "true",
         timeout: 120_000,
       },
 });

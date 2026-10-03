@@ -6,7 +6,11 @@ import {
   EditorialListingNotFoundError,
   updateEditorialListing,
 } from "@/lib/editorial/editorialService";
-import type { EditorScore, GuestSignalStatus, TrustTier } from "@/lib/scoring/trustTier";
+import type {
+  EditorScore,
+  GuestSignalStatus,
+  TrustTier,
+} from "@/lib/scoring/trustTier";
 
 type StoredListing = {
   id: string;
@@ -171,6 +175,9 @@ function createEditorialTestDb(initialListing: StoredListing | null) {
   };
 
   const db = {
+    async transaction<T>(callback: (tx: unknown) => Promise<T>) {
+      return callback(db);
+    },
     select() {
       const query = {
         from() {
@@ -179,7 +186,10 @@ function createEditorialTestDb(initialListing: StoredListing | null) {
         where() {
           return query;
         },
-        async limit() {
+        limit() {
+          return query;
+        },
+        async for() {
           return state.listing ? [{ ...state.listing }] : [];
         },
       };

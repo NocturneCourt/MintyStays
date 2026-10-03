@@ -5,11 +5,13 @@ export const metadata: Metadata = {
   title: "How Guest Signal Works",
   description:
     "MintyStays explains how Guest Signal is calculated without blending it with Editor Score.",
+  alternates: { canonical: "/guest-signal" },
+  openGraph: { title: "How Guest Signal Works", url: "/guest-signal" },
 };
 
 export default function GuestSignalPage() {
   return (
-    <main className="detail-shell">
+    <main id="main-content" className="detail-shell">
       <article className="detail-main explainer-main">
         <Link className="detail-back" href="/">
           Back to map
@@ -19,17 +21,17 @@ export default function GuestSignalPage() {
             <span className="eyebrow">Transparent formula</span>
             <h1>Guest Signal is not a vibe check.</h1>
             <p className="detail-summary">
-              It is a separate machine-auditable score from cooling mentions in
-              reviews and qualifying human contributions. Editor Score is a
-              different human layer and is never averaged into it.
+              It is a separate machine-auditable score from cooling mentions in reviews
+              and qualifying human contributions. Editor Score is a different human
+              layer and is never averaged into it.
             </p>
           </div>
           <aside className="detail-score-card">
             <span className="eyebrow">Hard rule</span>
             <p className="score-note">
-              Fewer than three cooling mentions means no number. Very old or
-              off-season mentions can also remain Unverified when their
-              effective sample is too thin.
+              Fewer than three cooling mentions means no number. Very old or off-season
+              mentions can also remain Unverified when their effective sample is too
+              thin.
             </p>
           </aside>
         </section>
@@ -43,7 +45,9 @@ export default function GuestSignalPage() {
               <li>Scraped baseline reviews, anonymous reports, and Insider reports.</li>
               <li>Review authored date, because extraction time is not evidence.</li>
               <li>Seasonality, because summer cooling reports matter more.</li>
-              <li>Broken or non-working AC mentions authored in the trailing 12 months.</li>
+              <li>
+                Broken or non-working AC mentions authored in the trailing 12 months.
+              </li>
             </ul>
           </div>
           <div className="detail-panel">
@@ -65,7 +69,9 @@ export default function GuestSignalPage() {
             <li>Count cooling mentions. Below three means Unverified.</li>
             <li>Apply source, authored-date recency, and seasonality weights.</li>
             <li>Calculate the positive-cooling ratio with a conservative prior.</li>
-            <li>Compute high, moderate, or low confidence from effective sample size.</li>
+            <li>
+              Compute high, moderate, or low confidence from effective sample size.
+            </li>
             <li>Subtract a soft capped penalty for recent broken-AC evidence.</li>
             <li>Clamp the result to 0-100 and show confidence beside the number.</li>
           </ol>

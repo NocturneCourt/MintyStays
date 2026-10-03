@@ -92,6 +92,16 @@ describe("validateSeedListings", () => {
     expect(result.errors[0].code).toBe("listing.missing_affiliate_url");
   });
 
+  it("flags affiliate URLs that cannot be used for tracked redirects", () => {
+    const result = validateSeedListings([
+      { ...validListing, affiliateBaseUrl: "https://example.com/stay" },
+    ]);
+
+    expect(result.warnings.map((issue) => issue.code)).toContain(
+      "listing.affiliate_url_not_allowlisted",
+    );
+  });
+
   it("treats placeholder source URLs as strict failures", () => {
     const result = validateSeedListings(
       [
