@@ -43,11 +43,12 @@ async function probeDatabase(databaseUrl: string | undefined): Promise<{
   }
 
   try {
-    const [{ db }, { sql }] = await Promise.all([
+    const [{ db }, { cities, listings }] = await Promise.all([
       import("@/db/client"),
-      import("drizzle-orm"),
+      import("@/db/schema"),
     ]);
-    await db.execute(sql`select 1`);
+    await db.select().from(cities).limit(0);
+    await db.select().from(listings).limit(0);
     return { ok: true };
   } catch (error) {
     console.error("Health database probe failed", error);

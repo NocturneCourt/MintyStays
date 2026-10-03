@@ -6,6 +6,7 @@
   },
   "deploy": {
     "preDeployCommand": ["pnpm env:check && pnpm db:migrate"],
+    "preDeployTimeoutSeconds": 300,
     "startCommand": "pnpm start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 120,

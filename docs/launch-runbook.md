@@ -28,19 +28,29 @@ This runbook covers the day-one public deploy for `mintystays.com` with
 
 1. Provision a Railway PostgreSQL database.
 2. Set the variables above in Railway.
-3. Deploy the app from the GitHub repository.
-4. `railway.json` validates production settings, applies migrations before the
-   new deployment starts, and checks `/api/health`. For a manual migration:
+3. Configure and verify the service settings before deploying from GitHub:
+   build `pnpm build`, start `pnpm start`, pre-deploy
+   `pnpm env:check && pnpm db:migrate`, health path `/api/health`, and a
+   300-second pre-deploy timeout. `docs/railway-service-settings.json` records
+   the intended settings for reference; apply them explicitly to the service.
+   Confirm migration logs, not just deployment status.
+4. For a manual migration inside Railway's private network:
 
    ```sh
    DATABASE_URL="$DATABASE_URL" pnpm db:migrate
    ```
 
-5. Seed the launch city through ManualImportAdapter:
+5. Initialize a new database through ManualImportAdapter inside the service:
 
    ```sh
    DATABASE_URL="$DATABASE_URL" LAUNCH_CITY_SLUG=lisbon pnpm db:seed
+   pnpm signals:recompute
    ```
+
+   If SSH access is unavailable, append `&& pnpm db:seed && pnpm
+   signals:recompute` to the pre-deploy command for the initial deployment only.
+   Restore the migration-only command after confirming all six listings were
+   imported. Do not keep automatic reseeding enabled on subsequent releases.
 
 6. Open `https://mintystays.com` and verify the Lisbon map, listing cards,
    detail pages, anonymous report form, and affiliate redirects.
@@ -48,6 +58,13 @@ This runbook covers the day-one public deploy for `mintystays.com` with
 Use the deployed service's actual HTTPS origin for `NEXT_PUBLIC_SITE_URL` and
 `NEXTAUTH_URL` until the custom domain is connected. Never use the local fallback
 dataset as production storage.
+
+The October 3 rollout detected the legacy `railway.json` but its deployment
+manifest cleared the release command and health settings, including values saved
+explicitly on the service. The root configuration file was removed so service
+settings control deployment. The reference JSON in `docs/` is not an automatic
+configuration source. Any future infrastructure-as-code migration must preserve
+the release command; the CLI migration preview left it as a comment.
 
 ## Score Refresh and Recovery
 
